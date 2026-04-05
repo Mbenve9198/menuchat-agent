@@ -45,7 +45,8 @@ async def search_similar_clients(
                 "clients": [
                     {
                         "name": r.get("name"),
-                        "city": (r.get("address", {}).get("city") or ""),
+                        "city": _extract_city(r.get("address", {})),
+                        "full_address": r.get("address", {}).get("formattedAddress", ""),
                         "current_reviews": r.get("currentReviewCount") or r.get("googleRating", {}).get("reviewCount"),
                         "initial_reviews": r.get("initialReviewCount", 0),
                         "reviews_gained": r.get("reviewsGained"),
@@ -72,3 +73,18 @@ async def search_similar_clients(
     except Exception as e:
         logger.warning("search_similar_clients failed: %s", e)
         return {"clients": [], "error": str(e)}
+
+
+def _extract_city(address: dict) -> str:
+    """Extract city name from formattedAddress like 'Via X, 00127 Roma RM, Italy'."""
+    formatted = address.get("formattedAddress", "")
+    if not formatted:
+        return ""
+    parts = formatted.split(",")
+    if len(parts) >= 3:
+        city_part = parts[-2].strip()
+        # Remove CAP and province code: "00127 Roma RM" → "Roma"
+        tokens = city_part.split()
+        city_tokens = [t for t in tokens if not t.isdigit() and len(t) > 2]
+        return " ".join(city_tokens) if city_tokens else city_part
+    return ""
