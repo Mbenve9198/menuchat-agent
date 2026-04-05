@@ -56,11 +56,10 @@ async def researcher_node(state: AgentState) -> dict:
             for c in raw_comps[:5]
         ]
 
-    # Parallel API calls
+    # Parallel API calls — always research Google for place_id + reviews
     tasks: dict[str, Any] = {}
 
-    needs_google = not contact.get("rating") or not contact.get("reviews")
-    if needs_google and (contact.get("name") and contact.get("city")):
+    if contact.get("name") and contact.get("city"):
         tasks["google"] = research_business(business_name=contact["name"], city=contact["city"])
 
     cuisine = contact.get("category") or "ristorante"

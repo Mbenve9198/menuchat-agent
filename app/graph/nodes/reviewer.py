@@ -44,17 +44,20 @@ def _scan_pii(text: str) -> list[str]:
     return violations
 
 
-def _build_reviewer_prompt(strategy: dict, research: dict, lead_source: str, stage: str) -> str:
-    is_first = stage == "initial_reply" and lead_source in ("inbound_rank_checker", "smartlead_outbound")
+def _build_reviewer_prompt(strategy: dict, research: dict, lead_source: str, stage: str, lead_message: str = "") -> str:
+    is_first_rc = stage == "initial_reply" and lead_source == "inbound_rank_checker"
     max_words = strategy.get("max_words", 100)
     do_not = strategy.get("do_not", [])
     data_summary = research.get("available_data_summary", "N/A")
 
+    lead_asked_how = any(kw in (lead_message or "").lower() for kw in ["come funziona", "funzionamento", "come fate", "spiegami", "dimmi come", "come lavorate", "che sistema"])
+    lead_asked_price = any(kw in (lead_message or "").lower() for kw in ["costo", "costi", "prezzo", "quanto costa", "listino", "tariff"])
+
     return f"""Sei un quality reviewer per messaggi di vendita. Controlla il messaggio contro le regole.
 
 REGOLE (se violate = FAIL):
-1. NON deve contenere descrizione DETTAGLIATA del meccanismo tecnico (QR code, WhatsApp bot, filtro recensioni). Frasi generiche SONO OK: "sistema automatico per raccogliere recensioni".
-2. {"E' un PRIMO CONTATTO: NON deve contenere il PREZZO NUMERICO (euro, cifre). 'Prova gratuita' e '2 settimane gratis' SONO OK." if is_first else "Il prezzo può essere menzionato."}
+1. {"Il lead ha CHIESTO come funziona — spiegare il meccanismo È OK e anzi NECESSARIO. NON è una violazione." if lead_asked_how else "NON deve contenere descrizione DETTAGLIATA del meccanismo tecnico (QR code, WhatsApp bot, filtro recensioni). Frasi generiche SONO OK."}
+2. {"E' un PRIMO CONTATTO RANK CHECKER: NON deve contenere il PREZZO NUMERICO." if is_first_rc else ("Il lead ha CHIESTO il prezzo — menzionarlo È OK e anzi NECESSARIO." if lead_asked_price else "Il prezzo può essere menzionato se appropriato.")}
 3. NON deve menzionare videochiamate, Zoom, Google Meet. "Chiamata al telefono" È OK.
 4. NON deve superare {max_words} parole. Conta attentamente.
 5. NON deve contenere dati inventati. Confronta OGNI nome, numero e statistica con i DATI DISPONIBILI sotto. Se non è presente → ALLUCINAZIONE = FAIL.
@@ -84,6 +87,7 @@ async def reviewer_node(state: AgentState) -> dict:
 
     lead_source = getattr(request, "lead_source", "smartlead_outbound")
     stage = getattr(request, "stage", "initial_reply")
+    lead_message = getattr(request, "lead_message", "") or ""
 
     pii_violations = _scan_pii(draft)
     if pii_violations:
@@ -93,7 +97,7 @@ async def reviewer_node(state: AgentState) -> dict:
             "review_attempts": review_attempts + 1,
         }
 
-    system_prompt = _build_reviewer_prompt(strategy, research, lead_source, stage)
+    system_prompt = _build_reviewer_prompt(strategy, research, lead_source, stage, lead_message)
 
     settings = get_settings()
     client = _get_client()

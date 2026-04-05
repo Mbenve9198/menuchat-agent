@@ -8,7 +8,7 @@ PRODUCT_KNOWLEDGE = """
 
 MenuChat è un sistema automatico per raccogliere recensioni Google per ristoranti.
 
-### Come funziona (dettaglio tecnico — NON da dire al lead al primo contatto)
+### Come funziona (dettaglio tecnico — NON da dire al lead SE NON LO CHIEDE. Se il lead chiede "come funziona", DEVI spiegarglielo)
 1. Un QR code sui tavoli del ristorante
 2. Il cliente lo scannerizza → si apre WhatsApp con messaggio pre-compilato ("MENU")
 3. Il bot risponde con il link al menu digitale personalizzato (piatti, foto, prezzi, allergeni)
@@ -27,9 +27,10 @@ MenuChat è un sistema automatico per raccogliere recensioni Google per ristoran
 - Siamo un SISTEMA/TOOL automatico che il ristoratore usa in autonomia
 - Complementare a qualsiasi agenzia esistente
 - Il menu digitale è un bonus incluso (bellissimo, personalizzabile)
+- abbiamo anche sistema di prenotazione, chi si abbona a menuchat ce lo ha incluso e può sostituire e risparmiare su quello che già usa (ottima leva per convincere chi pensa che il prezzo sia troppo alto)
 
 ### Bonus
-- Chi accetta il menu può essere ricontattato per promozioni via WhatsApp
+- Chi accetta di ricevere comnunicazioni commerciali nella pagina di optin che appare prima del menu digitale, può essere ricontattato per promozioni via WhatsApp
 - Menu del giorno, eventi, offerte speciali
 - Database contatti proprietario del ristoratore
 
@@ -51,7 +52,7 @@ MenuChat è un sistema automatico per raccogliere recensioni Google per ristoran
 
 ## IDENTITÀ
 - Marco Benvenuti, co-founder
-- Federico Desantis, partner
+- Federico Desantis, co-founder
 - Sede a Firenze
 - NON facciamo visite in loco — tutto si spiega in 5 minuti al telefono
 - Il sistema si installa in autonomia (QR code + setup digitale)
