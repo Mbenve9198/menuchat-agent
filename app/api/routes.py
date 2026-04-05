@@ -19,6 +19,27 @@ async def health():
     return {"status": "ok", "service": "menuchat-agent"}
 
 
+@router.get("/debug/config")
+async def debug_config():
+    """Temporary: verify env vars are set correctly. Remove after debugging."""
+    from app.config import get_settings
+    s = get_settings()
+    def mask(v):
+        if not v: return "NOT SET"
+        if len(v) <= 6: return v[:2] + "***"
+        return v[:4] + "***" + v[-3:]
+    return {
+        "anthropic_key": mask(s.anthropic_api_key),
+        "serpapi_key": mask(s.serpapi_key),
+        "menuchat_backend_url": s.menuchat_backend_url or "NOT SET",
+        "crm_api_key": mask(s.crm_api_key),
+        "crm_api_key_length": len(s.crm_api_key) if s.crm_api_key else 0,
+        "crm_api_key_repr": repr(s.crm_api_key) if s.crm_api_key else "NOT SET",
+        "smartlead_api_key": mask(s.smartlead_api_key),
+        "postgres_url": mask(s.postgres_url),
+    }
+
+
 @router.post("/agent/process", response_model=AgentResponse)
 async def process_reactive(request: AgentRequest):
     """Reactive flow: lead sent a message, generate a response."""

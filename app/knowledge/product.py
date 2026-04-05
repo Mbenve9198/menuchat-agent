@@ -58,6 +58,7 @@ MenuChat è un sistema automatico per raccogliere recensioni Google per ristoran
 - Il sistema si installa in autonomia (QR code + setup digitale)
 
 ## REGOLE DI COMUNICAZIONE
+- NON menzionare MAI TripAdvisor, Yelp o altre piattaforme. Noi lavoriamo SOLO con Google (recensioni Google Maps).
 - Tono: come un messaggio tra amici che lavorano. Mai "Gentilissimo", mai "Cordiali saluti"
 - Chiudi con "A presto" o direttamente col nome
 - Max 120 parole per email, max 80 per WhatsApp
