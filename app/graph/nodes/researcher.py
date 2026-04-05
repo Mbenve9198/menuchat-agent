@@ -185,20 +185,29 @@ def _build_data_summary(contact, ranking, competitors, similar_clients, fallback
     if contact.get("phone"):
         parts.append(f"Telefono: {contact['phone']}")
     if contact.get("rating"):
-        parts.append(f"Rating: {contact['rating']}")
+        parts.append(f"Rating Google: {contact['rating']}")
     if contact.get("reviews"):
-        parts.append(f"Recensioni: {contact['reviews']}")
+        parts.append(f"Recensioni Google totali: {contact['reviews']}")
     if ranking and ranking.get("main_rank"):
         parts.append(f"Posizione Maps: {ranking['main_rank']}° per \"{ranking.get('keyword')}\"")
     if ranking and ranking.get("estimated_lost_customers"):
-        parts.append(f"Clienti persi/settimana: ~{ranking['estimated_lost_customers']}")
+        parts.append(f"Clienti persi/settimana stimati: ~{ranking['estimated_lost_customers']}")
+    if ranking and ranking.get("daily_covers"):
+        parts.append(f"Coperti/giorno: {ranking['daily_covers']}")
     for c in competitors[:3]:
-        parts.append(f"Competitor: {c['name']} (pos {c['rank']}, {c.get('reviews', '?')} rec)")
+        parts.append(f"Competitor: {c['name']} (pos {c['rank']}, rating {c.get('rating', '?')}, {c.get('reviews', '?')} rec)")
     for c in similar_clients[:3]:
         parts.append(
-            f"Cliente MenuChat: {c.get('name')} ({c.get('city')}) — "
-            f"{c.get('reviews_gained')} rec in {c.get('months_active')} mesi"
+            f"Cliente MenuChat REALE: {c.get('name')} ({c.get('city')}) — "
+            f"raccolte {c.get('reviews_gained')} recensioni CON MENUCHAT in {c.get('months_active')} mesi "
+            f"(media {c.get('avg_reviews_per_month', '?')}/mese). "
+            f"Erano a {c.get('initial_reviews', '?')} recensioni, ora sono a {c.get('current_reviews', '?')}. "
+            f"Rating {c.get('rating', '?')}/5."
         )
+        if c.get("menu_url"):
+            parts.append(f"  → Menu digitale: {c['menu_url']}")
+        if c.get("menu_item_count"):
+            parts.append(f"  → {c['menu_item_count']} piatti nel menu")
     for c in fallback_studies[:3]:
-        parts.append(f"Case study: {c['name']} ({c['city']}) — {c['result']}")
+        parts.append(f"Case study generico: {c['name']} ({c['city']}) — {c['result']}")
     return "\n".join(parts)

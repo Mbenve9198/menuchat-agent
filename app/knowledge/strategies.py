@@ -20,9 +20,12 @@ STRATEGIC_PRINCIPLES = """
 
 ### 3. Social Proof
 - SEMPRE con dati REALI da clienti MenuChat verificati (mai inventare)
-- Format: "{nome} a {città} ha raccolto {reviewsGained} recensioni in {monthsActive} mesi"
-- Se disponibile, condividere il link al menu digitale del cliente come prova tangibile
-- Se non ci sono clienti nella zona, usare case study generici verificati
+- I dati vengono dalla ricerca: reviewsGained = recensioni raccolte CON MENUCHAT (non totali Google)
+- Format CORRETTO: "{nome} a {città} ha raccolto {reviewsGained} recensioni con MenuChat in {monthsActive} mesi — partiva da {initialReviews}, ora ne ha {currentReviews}"
+- Se disponibile il menuUrl: CONDIVIDI il link! "Guarda come funziona il menu di {nome}: {menuUrl}" — è la prova tangibile più forte
+- Se ci sono dati su avgReviewsPerMonth: citalo "raccoglie {avg}/mese con noi"
+- Se non ci sono clienti nella zona, usare i clienti più simili anche di altre zone
+- Se non ci sono clienti affatto, usare case study generici (ma specificare che sono generici)
 
 ### 4. CTA Universale
 - L'obiettivo è SEMPRE: ottenere numero di telefono + 5 minuti per parlare

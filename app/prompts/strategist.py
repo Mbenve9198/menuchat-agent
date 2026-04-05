@@ -115,11 +115,17 @@ def build_strategist_user_input(lead_message: str, research: dict, conversation_
 
     similar = research.get("similar_clients", [])
     if similar:
-        parts.append("\nCLIENTI MENUCHAT SIMILI (social proof reale):")
+        parts.append("\nCLIENTI MENUCHAT REALI (usa come social proof — questi sono dati VERIFICATI):")
         for c in similar[:3]:
-            parts.append(f"- {c.get('name')} ({c.get('city')}): +{c.get('reviews_gained')} rec in {c.get('months_active')} mesi")
+            parts.append(
+                f"- {c.get('name')} ({c.get('city')}): ha raccolto {c.get('reviews_gained')} recensioni CON MENUCHAT "
+                f"in {c.get('months_active')} mesi (media {c.get('avg_reviews_per_month', '?')}/mese). "
+                f"Partiva da {c.get('initial_reviews', '?')} recensioni, ora ne ha {c.get('current_reviews', '?')}."
+            )
             if c.get("menu_url"):
-                parts.append(f"  Menu: {c['menu_url']}")
+                parts.append(f"  → CONDIVIDI questo link al menu: {c['menu_url']} (il lead può vederlo con i propri occhi)")
+            if c.get("menu_item_count"):
+                parts.append(f"  → Menu con {c['menu_item_count']} piatti")
     else:
         fallback = research.get("fallback_case_studies", [])
         if fallback:
