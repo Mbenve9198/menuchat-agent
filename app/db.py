@@ -1,16 +1,17 @@
-import asyncpg
+from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app.config import get_settings
 
-_pool: asyncpg.Pool | None = None
+_pool: AsyncConnectionPool | None = None
 _checkpointer: AsyncPostgresSaver | None = None
 
 
 async def init_db():
     global _pool, _checkpointer
     settings = get_settings()
-    _pool = await asyncpg.create_pool(settings.postgres_url, min_size=2, max_size=10)
+    _pool = AsyncConnectionPool(conninfo=settings.postgres_url, min_size=2, max_size=10, open=False)
+    await _pool.open()
     _checkpointer = AsyncPostgresSaver(_pool)
     await _checkpointer.setup()
 
