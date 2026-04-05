@@ -85,22 +85,29 @@ async def strategist_node(state: AgentState) -> dict:
     settings = get_settings()
     client = _get_client()
 
-    resp = await client.messages.create(
+    thinking_text = ""
+    output_text = ""
+    input_tokens = 0
+    output_tokens = 0
+
+    async with client.messages.stream(
         model=settings.model_strategist,
         max_tokens=settings.strategist_max_tokens,
         temperature=1,
         thinking={"type": "enabled", "budget_tokens": settings.strategist_thinking_budget},
         system=system_prompt,
         messages=[{"role": "user", "content": user_input}],
-    )
+    ) as stream:
+        resp = await stream.get_final_message()
 
-    thinking_text = ""
-    output_text = ""
     for block in resp.content:
         if block.type == "thinking":
             thinking_text += block.thinking
         elif block.type == "text":
             output_text += block.text
+
+    input_tokens = resp.usage.input_tokens or 0
+    output_tokens = resp.usage.output_tokens or 0
 
     if thinking_text:
         logger.info("Strategist thinking: %s...", thinking_text[:500])
@@ -112,9 +119,6 @@ async def strategist_node(state: AgentState) -> dict:
     except (json.JSONDecodeError, ValueError) as e:
         logger.error("Strategist JSON parse error: %s | raw: %s", e, output_text[:500])
         strategy = _default_strategy(research)
-
-    input_tokens = resp.usage.input_tokens or 0
-    output_tokens = resp.usage.output_tokens or 0
 
     logger.info(
         "Strategist: approach=%s tone=%s channel=%s tokens=%d+%d",
