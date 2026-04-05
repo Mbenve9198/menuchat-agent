@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     model_router: str = "claude-haiku-4-5-20251001"
     model_critic: str = "claude-sonnet-4-20250514"
 
-    strategist_thinking_budget: int = 32000
+    strategist_thinking_budget: int = 10000
     strategist_max_tokens: int = 16000
     writer_max_tokens: int = 4000
     reviewer_max_tokens: int = 1000
