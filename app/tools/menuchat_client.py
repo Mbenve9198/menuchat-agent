@@ -21,7 +21,9 @@ async def search_similar_clients(
     if not settings.menuchat_backend_url:
         return {"clients": [], "note": "MenuChat backend not configured"}
 
-    params: dict[str, str] = {"type": cuisine_type, "limit": "3"}
+    params: dict[str, str] = {"limit": "3"}
+    if cuisine_type:
+        params["type"] = cuisine_type
     if city:
         params["city"] = city
     if region:

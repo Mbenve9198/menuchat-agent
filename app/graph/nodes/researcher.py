@@ -62,7 +62,7 @@ async def researcher_node(state: AgentState) -> dict:
     if contact.get("name") and contact.get("city"):
         tasks["google"] = research_business(business_name=contact["name"], city=contact["city"])
 
-    cuisine = contact.get("category") or "ristorante"
+    cuisine = contact.get("category") or ""
     city = contact.get("city")
     tasks["similar"] = _search_similar_progressive(cuisine, city)
 
@@ -143,16 +143,23 @@ async def researcher_node(state: AgentState) -> dict:
 
 
 async def _search_similar_progressive(cuisine: str, city: str | None) -> dict:
-    """Progressive search: city → region → national."""
-    result = await search_similar_clients(cuisine, city=city)
-    if result.get("clients"):
-        return result
-    if city:
-        result = await search_similar_clients(cuisine, region=city)
+    """Progressive search: type+city → type+region → type only → no filters."""
+    if cuisine:
+        result = await search_similar_clients(cuisine, city=city)
         if result.get("clients"):
             return result
-    result = await search_similar_clients(cuisine)
-    return result
+        if city:
+            result = await search_similar_clients(cuisine, region=city)
+            if result.get("clients"):
+                return result
+        result = await search_similar_clients(cuisine)
+        if result.get("clients"):
+            return result
+    # Fallback: no type filter — get any MenuChat client
+    result = await search_similar_clients("", city=city)
+    if result.get("clients"):
+        return result
+    return await search_similar_clients("")
 
 
 async def _gather_dict(tasks: dict[str, Any]) -> dict:
