@@ -85,7 +85,6 @@ async def fetch_recent_reviews(place_id: str, num_reviews: int = 10) -> list[dic
         "api_key": settings.serpapi_key,
         "hl": "it",
         "sort_by": "newestFirst",
-        "num": str(num_reviews),
     }
 
     try:
