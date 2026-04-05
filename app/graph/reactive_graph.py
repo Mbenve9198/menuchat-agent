@@ -30,7 +30,7 @@ def _route_by_complexity(state: AgentState) -> str:
 
 def _route_after_strategy(state: AgentState) -> str:
     strategy = state.get("strategy", {})
-    if strategy.get("approach") == "hibernate":
+    if strategy.get("hibernate"):
         return "hibernate"
     if strategy.get("escalate_human"):
         return "build_response"

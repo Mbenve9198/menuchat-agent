@@ -1,6 +1,6 @@
 """
-SerpAPI client for Google Maps business data + reviews.
-Used by the researcher node for deep research.
+SerpAPI client — Google Maps business data, reviews, ranking, competitor research.
+Tools used by the agentic researcher.
 """
 
 import logging
@@ -15,19 +15,19 @@ logger = logging.getLogger("agent-service.tools.serpapi")
 SERPAPI_BASE = "https://serpapi.com/search.json"
 
 
+def _get_key() -> str:
+    return get_settings().serpapi_key
+
+
 async def research_business(
     *, place_id: str | None = None, business_name: str | None = None, city: str | None = None
 ) -> dict[str, Any]:
     """Fetch business details from Google Maps via SerpAPI."""
-    settings = get_settings()
-    if not settings.serpapi_key:
+    key = _get_key()
+    if not key:
         return {"error": "SERPAPI_KEY not configured"}
 
-    params: dict[str, Any] = {
-        "engine": "google_maps",
-        "api_key": settings.serpapi_key,
-        "hl": "it",
-    }
+    params: dict[str, Any] = {"engine": "google_maps", "api_key": key, "hl": "it"}
 
     if place_id:
         params["place_id"] = place_id
@@ -73,19 +73,24 @@ async def research_business(
     return {"error": "No results found"}
 
 
-async def fetch_recent_reviews(place_id: str, num_reviews: int = 10) -> list[dict]:
-    """Fetch recent Google reviews for a place via SerpAPI."""
-    settings = get_settings()
-    if not settings.serpapi_key:
-        return []
+async def fetch_reviews(place_id: str, *, next_page_token: str | None = None) -> dict:
+    """
+    Fetch Google reviews for a place. Returns up to 8 reviews per call.
+    Pass next_page_token to paginate and get more reviews.
+    """
+    key = _get_key()
+    if not key:
+        return {"reviews": [], "error": "SERPAPI_KEY not configured"}
 
-    params = {
+    params: dict[str, Any] = {
         "engine": "google_maps_reviews",
         "place_id": place_id,
-        "api_key": settings.serpapi_key,
+        "api_key": key,
         "hl": "it",
         "sort_by": "newestFirst",
     }
+    if next_page_token:
+        params["next_page_token"] = next_page_token
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -94,35 +99,49 @@ async def fetch_recent_reviews(place_id: str, num_reviews: int = 10) -> list[dic
             data = resp.json()
 
         reviews = []
-        for r in data.get("reviews", [])[:num_reviews]:
+        for r in data.get("reviews", []):
             reviews.append({
                 "rating": r.get("rating"),
                 "text": (r.get("snippet") or r.get("text") or "")[:500],
                 "date": r.get("date") or r.get("iso_date"),
                 "author": r.get("user", {}).get("name", ""),
             })
-        return reviews
+
+        return {
+            "reviews": reviews,
+            "next_page_token": data.get("serpapi_pagination", {}).get("next_page_token"),
+        }
     except Exception as e:
-        logger.warning("fetch_recent_reviews failed for %s: %s", place_id, e)
-        return []
+        logger.warning("fetch_reviews failed for %s: %s", place_id, e)
+        return {"reviews": [], "error": str(e)}
 
 
-async def get_maps_ranking(keyword: str, *, latitude: float | None = None, longitude: float | None = None) -> dict:
-    """Check ranking position for a keyword on Google Maps."""
-    settings = get_settings()
-    if not settings.serpapi_key:
+async def check_ranking(
+    keyword: str,
+    *,
+    latitude: float,
+    longitude: float,
+    place_id: str | None = None,
+    restaurant_name: str | None = None,
+) -> dict:
+    """
+    Live rank check on Google Maps for a keyword + location.
+    Finds the restaurant's position and identifies competitors.
+    Matches by place_id first, then by name.
+    """
+    key = _get_key()
+    if not key:
         return {"error": "SERPAPI_KEY not configured"}
 
     params: dict[str, Any] = {
         "engine": "google_maps",
         "type": "search",
         "q": keyword,
-        "api_key": settings.serpapi_key,
+        "ll": f"@{latitude},{longitude},15z",
+        "api_key": key,
         "hl": "it",
         "num": "20",
     }
-    if latitude and longitude:
-        params["ll"] = f"@{latitude},{longitude},15z"
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.get(SERPAPI_BASE, params=params)
@@ -130,17 +149,59 @@ async def get_maps_ranking(keyword: str, *, latitude: float | None = None, longi
         data = resp.json()
 
     results = data.get("local_results", [])
-    competitors = []
-    for r in results[:10]:
-        competitors.append({
-            "name": r.get("title"),
-            "rank": r.get("position"),
-            "rating": r.get("rating"),
-            "reviews": r.get("reviews"),
-        })
+    user_rank = None
+    user_data = None
+    competitors_ahead = []
+    all_competitors = []
+
+    for r in results:
+        is_match = False
+        if place_id and r.get("place_id") == place_id:
+            is_match = True
+        elif restaurant_name:
+            r_name = (r.get("title") or "").lower()
+            s_name = restaurant_name.lower()
+            if r_name in s_name or s_name in r_name:
+                is_match = True
+
+        if is_match:
+            user_rank = r.get("position")
+            user_data = {
+                "name": r.get("title"),
+                "rank": user_rank,
+                "rating": r.get("rating"),
+                "reviews": r.get("reviews"),
+                "place_id": r.get("place_id"),
+            }
+        else:
+            comp = {
+                "name": r.get("title"),
+                "rank": r.get("position"),
+                "rating": r.get("rating"),
+                "reviews": r.get("reviews"),
+                "place_id": r.get("place_id"),
+            }
+            all_competitors.append(comp)
+            if user_rank is None or (r.get("position") or 99) < user_rank:
+                competitors_ahead.append(comp)
+
+    estimated_lost = None
+    if user_rank and user_rank > 1:
+        estimated_lost = round((user_rank - 1) * 5)
 
     return {
         "keyword": keyword,
+        "user_rank": user_rank or "Fuori dalla Top 20",
+        "user_restaurant": user_data,
+        "competitors_ahead": competitors_ahead[:5],
+        "all_results": all_competitors[:10],
         "total_results": len(results),
-        "competitors": competitors,
+        "estimated_lost_customers_per_week": estimated_lost,
     }
+
+
+async def research_competitor(
+    *, place_id: str | None = None, competitor_name: str | None = None, city: str | None = None
+) -> dict[str, Any]:
+    """Look up a specific competitor on Google Maps."""
+    return await research_business(place_id=place_id, business_name=competitor_name, city=city)

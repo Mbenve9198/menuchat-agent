@@ -28,7 +28,7 @@ async def build_response_node(state: AgentState) -> dict:
     tool_intents = list(state.get("tool_intents", []))
 
     # Determine action
-    if strategy.get("approach") == "hibernate":
+    if strategy.get("hibernate"):
         action = "hibernated"
     elif strategy.get("escalate_human"):
         action = "escalate_human"
@@ -61,9 +61,9 @@ async def build_response_node(state: AgentState) -> dict:
 
     # Build strategy output for logging
     strategy_out = StrategyOutput(
-        approach=strategy.get("approach"),
+        approach=strategy.get("strategy") or strategy.get("approach"),
         main_angle=strategy.get("reasoning", "")[:500],
-        tone=strategy.get("tone"),
+        tone=strategy.get("tone_description") or strategy.get("tone"),
         reasoning=strategy.get("thinking", "")[:2000],
         raw=strategy,
     )

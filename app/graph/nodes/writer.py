@@ -1,8 +1,9 @@
 """
 Writer node — Sonnet 4.6, low temperature.
-Transforms the strategist's JSON plan into natural Italian sales copy.
+Transforms the strategist's plan into natural Italian sales copy.
 """
 
+import json
 import logging
 
 import anthropic
@@ -27,37 +28,58 @@ def _build_writer_system(identity, review_feedback: str | None = None) -> str:
     surname = identity.surname if hasattr(identity, "surname") else identity.get("surname", "Benvenuti")
     role = identity.role if hasattr(identity, "role") else identity.get("role", "co-founder")
 
-    prompt = f"""Sei {name} {surname}, {role} di MenuChat. Scrivi messaggi a ristoratori italiani.
+    prompt = f"""Sei {name} {surname}, {role} di MenuChat. Scrivi un messaggio a un ristoratore italiano.
 
-TONO: come un messaggio tra colleghi che lavorano. Diretto, amichevole, zero formalità.
-Mai "Gentilissimo", mai "Cordiali saluti". Chiudi con "A presto" o col nome.
+Riceverai un piano dallo strategist con: la strategia, le istruzioni per il messaggio, i dati da citare, il tono, e le cose da NON fare.
 
-Riceverai un PIANO JSON con: approach, message_structure, data_to_include, tone, max_words, do_not.
-
-REGOLE CRITICHE:
-- Massimo {{max_words}} parole (dal piano). Conta le parole — NON sforare.
-- Segui il piano alla lettera. Le voci in "do_not" sono PROIBIZIONI ASSOLUTE.
-- Se il piano ha social proof con dati, DEVI citarli nel messaggio.
-- Se il piano ha CTA "confirm_number", DEVI includere il numero e chiedere conferma.
+COME SCRIVI:
+- Come un messaggio tra colleghi che lavorano. Diretto, amichevole, zero formalità.
+- Mai "Gentilissimo", mai "Cordiali saluti". Chiudi con "A presto" o col nome.
 - Firma solo "{name}".
-- NON inventare MAI informazioni che non sono nel piano o nei dati forniti.
+- NON inventare MAI dati che non sono nel piano o nei dati forniti.
 - NON attribuire al lead frasi che non ha detto.
+- NON menzionare MAI TripAdvisor, Yelp o piattaforme diverse da Google.
+- Il QR code è per il MENU, NON per le recensioni. La richiesta di recensione arriva DOPO il pasto.
 
 Scrivi SOLO il testo del messaggio, nient'altro."""
 
     if review_feedback:
-        prompt += f"\n\nATTENZIONE — IL REVIEWER HA TROVATO PROBLEMI NELLA BOZZA PRECEDENTE:\n{review_feedback}\nRiscrivi il messaggio correggendo TUTTI i problemi segnalati."
+        prompt += f"\n\nATTENZIONE — IL REVIEWER HA TROVATO PROBLEMI NELLA BOZZA PRECEDENTE:\n{review_feedback}\nRiscrivi correggendo TUTTI i problemi."
 
     return prompt
 
 
 def _build_writer_input(strategy: dict, research: dict, messages: list) -> str:
-    import json
-    parts = [f"PIANO STRATEGICO:\n{json.dumps(strategy, ensure_ascii=False, indent=2)}\n"]
+    parts = []
+
+    plan = strategy.get("message_plan") or strategy.get("strategy", "")
+    reasoning = strategy.get("reasoning", "")
+    data_to_cite = strategy.get("data_to_cite", [])
+    tone = strategy.get("tone_description") or strategy.get("tone", "amichevole e diretto")
+    max_words = strategy.get("max_words", 100)
+    do_not = strategy.get("do_not", [])
+
+    parts.append(f"STRATEGIA SCELTA:\n{reasoning}\n")
+    parts.append(f"ISTRUZIONI PER IL MESSAGGIO:\n{plan}\n")
+
+    if data_to_cite:
+        parts.append("DATI DA CITARE (usa questi, sono verificati):")
+        for d in data_to_cite:
+            parts.append(f"  • {d}")
+        parts.append("")
+
+    parts.append(f"TONO: {tone}")
+    parts.append(f"MAX PAROLE: {max_words}")
+
+    if do_not:
+        parts.append("NON FARE:")
+        for d in do_not:
+            parts.append(f"  • {d}")
+        parts.append("")
 
     if messages:
         recent = messages[-6:] if len(messages) > 6 else messages
-        parts.append("ULTIMI MESSAGGI:")
+        parts.append("ULTIMI MESSAGGI DELLA CONVERSAZIONE:")
         for m in recent:
             role = m.role if hasattr(m, "role") else m.get("role", "?")
             content = m.content if hasattr(m, "content") else m.get("content", "")
@@ -65,14 +87,9 @@ def _build_writer_input(strategy: dict, research: dict, messages: list) -> str:
         parts.append("")
 
     contact = research.get("contact", {})
-    parts.append(f"DATI LEAD:\n- Nome: {contact.get('name', 'N/A')}")
-    if contact.get("phone"):
-        parts.append(f"- Telefono: {contact['phone']}")
-    if contact.get("city"):
-        parts.append(f"- Città: {contact['city']}")
+    parts.append(f"LEAD: {contact.get('name', 'N/A')} | {contact.get('city', '')} | Tel: {contact.get('phone', 'non disponibile')}")
 
-    max_words = strategy.get("max_words", 100)
-    parts.append(f"\nScrivi il messaggio ora. Massimo {max_words} parole.")
+    parts.append(f"\nScrivi il messaggio. Massimo {max_words} parole.")
 
     return "\n".join(parts)
 
@@ -88,9 +105,6 @@ async def writer_node(state: AgentState) -> dict:
     messages = getattr(request, "messages", []) or []
 
     system_prompt = _build_writer_system(identity, review_feedback if review_attempts > 0 else None)
-    max_words = strategy.get("max_words", 100)
-    system_prompt = system_prompt.replace("{max_words}", str(max_words))
-
     user_input = _build_writer_input(strategy, research, messages)
 
     settings = get_settings()
@@ -105,9 +119,9 @@ async def writer_node(state: AgentState) -> dict:
     )
 
     draft = resp.content[0].text.strip()
-    word_count = len(draft.split())
+    max_words = strategy.get("max_words", 100)
 
-    logger.info("Writer: %d words (max %d), retry=%d", word_count, max_words, review_attempts)
+    logger.info("Writer: %d words (max %d), retry=%d", len(draft.split()), max_words, review_attempts)
 
     return {
         "draft": draft,

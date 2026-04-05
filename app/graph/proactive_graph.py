@@ -25,7 +25,7 @@ logger = logging.getLogger("agent-service.graph.proactive")
 
 def _route_after_strategy(state: AgentState) -> str:
     strategy = state.get("strategy", {})
-    if strategy.get("approach") == "hibernate":
+    if strategy.get("hibernate"):
         return "hibernate"
     if strategy.get("escalate_human"):
         return "build_response"

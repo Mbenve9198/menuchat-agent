@@ -121,8 +121,10 @@ async def strategist_node(state: AgentState) -> dict:
         strategy = _default_strategy(research)
 
     logger.info(
-        "Strategist: approach=%s tone=%s channel=%s tokens=%d+%d",
-        strategy.get("approach"), strategy.get("tone"), strategy.get("channel"),
+        "Strategist: strategy=%s tone=%s channel=%s tokens=%d+%d",
+        (strategy.get("strategy") or strategy.get("approach", ""))[:100],
+        (strategy.get("tone_description") or strategy.get("tone", ""))[:50],
+        strategy.get("channel"),
         input_tokens, output_tokens,
     )
 
@@ -136,23 +138,12 @@ async def strategist_node(state: AgentState) -> dict:
 
 
 def _default_strategy(research: dict) -> dict:
-    similar = research.get("similar_clients", [])
-    proof = None
-    if similar:
-        c = similar[0]
-        proof = {"name": c.get("name"), "data": f"{c.get('reviews_gained')} rec in {c.get('months_active')} mesi", "menu_url": c.get("menu_url")}
-
     return {
-        "approach": "social_proof",
         "reasoning": "Fallback strategy — parse error on strategist output",
-        "message_structure": [
-            {"section": "opener", "instruction": "Saluta e personalizza"},
-            {"section": "body", "instruction": "Usa dati disponibili"},
-            {"section": "proof", "instruction": "Cita cliente simile se disponibile"},
-            {"section": "cta", "instruction": "Chiedi numero per 5 minuti"},
-        ],
-        "data_to_include": {"similar_client": proof},
-        "tone": "consultivo",
+        "strategy": "Presentati, usa i dati disponibili, proponi la prova gratuita, chiedi il numero per 5 minuti",
+        "message_plan": "Saluta con il nome del ristorante. Cita un dato concreto dalla ricerca se disponibile. Proponi la prova gratuita. Chiedi il numero per una chiamata di 5 minuti.",
+        "data_to_cite": [],
+        "tone_description": "Amichevole e diretto, come un collega",
         "max_words": 100,
         "do_not": [],
         "channel": "email",
