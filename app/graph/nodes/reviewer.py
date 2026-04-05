@@ -65,6 +65,14 @@ REGOLE (se violate = FAIL):
 7. DEVE avere una CTA chiara alla fine.
 8. DEVE essere firmato col nome.
 9. Il tono deve sembrare umano, non da bot AI.
+10. NON deve menzionare TripAdvisor, Yelp o qualsiasi piattaforma diversa da Google.
+11. ERRORI FATTUALI SUL PRODOTTO (se presenti = FAIL IMMEDIATO):
+    - Il QR code è per il MENU, NON per le recensioni
+    - TUTTI i clienti scansionano il QR (non solo i soddisfatti)
+    - La richiesta di recensione arriva DOPO il pasto via WhatsApp, NON al momento della scansione
+    - Se dice "i clienti soddisfatti scansionano il QR per recensire" = FAIL
+    - Se dice "scansionano per lasciare una recensione" = FAIL
+    - Se confonde il momento del menu col momento della recensione = FAIL
 
 PROIBIZIONI DAL PIANO:
 {chr(10).join('- ' + d for d in do_not)}
