@@ -1,0 +1,103 @@
+"""
+Build Response node — assembles the final AgentResponse from graph state.
+"""
+
+import logging
+
+from app.api.models import AgentResponse, ToolIntent, Insights, StrategyOutput
+from app.graph.state import AgentState
+
+logger = logging.getLogger("agent-service.nodes.response")
+
+COST_PER_INPUT_TOKEN = {
+    "opus": 5.0 / 1_000_000,
+    "sonnet": 3.0 / 1_000_000,
+    "haiku": 1.0 / 1_000_000,
+}
+COST_PER_OUTPUT_TOKEN = {
+    "opus": 25.0 / 1_000_000,
+    "sonnet": 15.0 / 1_000_000,
+    "haiku": 5.0 / 1_000_000,
+}
+
+
+async def build_response_node(state: AgentState) -> dict:
+    strategy = state.get("strategy") or {}
+    draft = state.get("draft")
+    review = state.get("review_result") or {}
+    tool_intents = list(state.get("tool_intents", []))
+
+    # Determine action
+    if strategy.get("approach") == "hibernate":
+        action = "hibernated"
+    elif strategy.get("escalate_human"):
+        action = "escalate_human"
+    elif draft and review.get("pass", False):
+        action = "draft_ready"
+    elif draft and not review.get("pass", False):
+        action = "awaiting_human"
+    else:
+        action = "escalate_human"
+
+    channel = strategy.get("channel", "email")
+
+    # Accumulate future actions as schedule_task intents
+    for fa in strategy.get("future_actions", []):
+        fa_type = fa.get("type", "schedule_task")
+        if fa_type == "hibernate_workflow":
+            continue  # handled by hibernate node
+        delay = fa.get("delay_days", 3)
+        from datetime import datetime, timedelta, timezone
+        wake = datetime.now(timezone.utc) + timedelta(days=delay)
+        tool_intents.append({
+            "tool": "schedule_task",
+            "params": {
+                "task_type": fa.get("task_type", "follow_up_no_reply"),
+                "scheduled_at": wake.isoformat(),
+                "context": {"reason": fa.get("reason", ""), "attempt": fa.get("attempt", 1)},
+                "priority": fa.get("priority", "medium"),
+            },
+        })
+
+    # Build strategy output for logging
+    strategy_out = StrategyOutput(
+        approach=strategy.get("approach"),
+        main_angle=strategy.get("reasoning", "")[:500],
+        tone=strategy.get("tone"),
+        reasoning=strategy.get("thinking", "")[:2000],
+        raw=strategy,
+    )
+
+    # Estimate cost (rough, uses Opus as primary)
+    input_t = state.get("total_input_tokens", 0)
+    output_t = state.get("total_output_tokens", 0)
+    cost = input_t * COST_PER_INPUT_TOKEN["opus"] + output_t * COST_PER_OUTPUT_TOKEN["opus"]
+
+    response = AgentResponse(
+        action=action,
+        draft=draft,
+        channel=channel,
+        strategy=strategy_out,
+        tool_intents=[ToolIntent(**ti) for ti in tool_intents],
+        new_stage=_infer_stage(strategy, action),
+        extracted_insights=Insights(),
+        thinking=strategy.get("thinking", "")[:2000],
+        model_used="opus-4.6",
+        total_tokens=input_t + output_t,
+        estimated_cost_usd=round(cost, 4),
+    )
+
+    return {"response": response}
+
+
+def _infer_stage(strategy: dict, action: str) -> str | None:
+    if action == "hibernated":
+        return "paused"
+    approach = strategy.get("approach", "")
+    if approach in ("escalate_human",):
+        return None
+    if strategy.get("future_actions"):
+        for fa in strategy["future_actions"]:
+            if fa.get("task_type") == "human_task":
+                return "handoff"
+    return None
