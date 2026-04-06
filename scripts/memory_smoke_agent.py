@@ -8,12 +8,14 @@ Smoke test memoria agente in produzione (o locale).
    - 1ª chiamata: di solito "0 episodes, 0 contact memories" (DB vuoto)
    - 2ª chiamata: "N contact memories" con N >= 1 se lo storage contatto funziona
 
-Uso:
-  AGENT_URL=https://tuo-agent.onrender.com python scripts/memory_smoke_agent.py 1
-  AGENT_URL=https://tuo-agent.onrender.com python scripts/memory_smoke_agent.py 2
+Uso (legge automaticamente menuchat-agent/.env se presente):
+  python scripts/memory_smoke_agent.py 1
+  python scripts/memory_smoke_agent.py 2
 
-Opzionale:
-  MEMORY_TEST_EMAIL=prova@tuodominio.it
+Oppure esplicito:
+  AGENT_URL=https://… python scripts/memory_smoke_agent.py 1
+
+In .env: AGENT_URL=… (o AGENT_SERVICE_URL). Opzionale: MEMORY_TEST_EMAIL=…
 """
 
 from __future__ import annotations
@@ -24,8 +26,39 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 DEFAULT_EMAIL = "memory-smoke-test@menuchat-verify.local"
+
+
+def _load_env_file(repo_root: Path) -> None:
+    """Legge menuchat-agent/.env — preferisce python-dotenv; altrimenti solo chiavi necessarie."""
+    path = repo_root / ".env"
+    if not path.is_file():
+        return
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(path, override=False)
+        return
+    except ImportError:
+        pass
+    # Fallback: solo variabili usate da questo script (evita parsing fragile su CRM_API_KEY ecc.)
+    prefixes = ("AGENT_URL=", "AGENT_SERVICE_URL=", "MEMORY_TEST_EMAIL=", "MEMORY_TEST_CONV_ID=")
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not line.startswith(prefixes):
+            continue
+        key, _, val = line.partition("=")
+        val = val.strip().strip('"').strip("'")
+        if key and val and key not in os.environ:
+            os.environ[key] = val
+
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_load_env_file(_REPO_ROOT)
 
 
 def main() -> None:
