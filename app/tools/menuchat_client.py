@@ -16,18 +16,37 @@ logger = logging.getLogger("agent-service.tools.menuchat")
 async def search_similar_clients(
     cuisine_type: str, *, city: str | None = None, region: str | None = None
 ) -> dict[str, Any]:
-    """Find MenuChat restaurants similar to the lead for social proof."""
+    """
+    Find MenuChat restaurants similar to the lead for social proof.
+    Internally does progressive fallback: type+city → city only → type only → no filter.
+    """
     settings = get_settings()
     if not settings.menuchat_backend_url:
         return {"clients": [], "note": "MenuChat backend not configured"}
 
-    params: dict[str, str] = {"limit": "3"}
-    if cuisine_type:
-        params["type"] = cuisine_type
+    searches = []
+    if cuisine_type and city:
+        searches.append({"type": cuisine_type, "city": city})
     if city:
-        params["city"] = city
-    if region:
-        params["region"] = region
+        searches.append({"city": city})
+    if cuisine_type:
+        searches.append({"type": cuisine_type})
+    searches.append({})
+
+    for search_params in searches:
+        result = await _do_search(settings, search_params)
+        if result.get("clients"):
+            return result
+
+    return {
+        "clients": [],
+        "note": "Nessun cliente MenuChat trovato in nessuna ricerca.",
+    }
+
+
+async def _do_search(settings, extra_params: dict) -> dict[str, Any]:
+    params: dict[str, str] = {"limit": "3"}
+    params.update(extra_params)
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -60,18 +79,9 @@ async def search_similar_clients(
                     for r in restaurants
                 ],
             }
-
-        return {
-            "clients": [],
-            "fallback_case_studies": [
-                {"name": "MOOD", "city": "Gibellina (TP)", "result": "più di 100 recensioni/mese"},
-                {"name": "La Capannina", "city": "Volla (NA)", "result": "più di 100 recensioni/mese"},
-                {"name": "Il Porto", "city": "Livorno", "result": "più di 100 recensioni/mese"},
-                {"name": "Arnold's", "city": "Firenze", "result": "più di 100 recensioni/mese"},
-            ],
-        }
+        return {"clients": []}
     except Exception as e:
-        logger.warning("search_similar_clients failed: %s", e)
+        logger.warning("search_similar_clients failed (%s): %s", extra_params, e)
         return {"clients": [], "error": str(e)}
 
 
@@ -83,7 +93,6 @@ def _extract_city(address: dict) -> str:
     parts = formatted.split(",")
     if len(parts) >= 3:
         city_part = parts[-2].strip()
-        # Remove CAP and province code: "00127 Roma RM" → "Roma"
         tokens = city_part.split()
         city_tokens = [t for t in tokens if not t.isdigit() and len(t) > 2]
         return " ".join(city_tokens) if city_tokens else city_part
