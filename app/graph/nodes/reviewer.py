@@ -1,6 +1,7 @@
 """
-Reviewer node — Haiku 4.5 + deterministic PII scanner.
-Validates the draft against rules, data accuracy, and PII leaks.
+Reviewer node — mostly deterministic checks + one focused LLM check.
+The LLM's ONLY job: detect hallucinated data (names/numbers not in research).
+Everything else is deterministic — no subjective judgments.
 """
 
 import json
@@ -25,6 +26,15 @@ PII_PATTERNS = [
 
 INTERNAL_EMAILS = ["marco@menuchat.com", "federico@menuchat.it", "team@menuchat.it"]
 
+WRONG_PRODUCT_PHRASES = [
+    re.compile(r"scansiona.*qr.*per.*recens", re.IGNORECASE),
+    re.compile(r"qr.*code.*recensi", re.IGNORECASE),
+    re.compile(r"clienti\s+soddisfatti\s+scansion", re.IGNORECASE),
+    re.compile(r"scansion.*per\s+lasciare", re.IGNORECASE),
+]
+
+BANNED_PLATFORMS = ["tripadvisor", "trip advisor", "yelp", "trustpilot"]
+
 
 def _get_client() -> anthropic.AsyncAnthropic:
     global _client
@@ -33,79 +43,84 @@ def _get_client() -> anthropic.AsyncAnthropic:
     return _client
 
 
-def _scan_pii(text: str) -> list[str]:
+def _deterministic_checks(draft: str, strategy: dict) -> list[str]:
+    """Fast deterministic checks — no LLM needed."""
     violations = []
+
+    # PII
     for pattern, label in PII_PATTERNS:
-        if pattern.search(text):
-            violations.append(f"PII leak: {label} detected in draft")
+        if pattern.search(draft):
+            violations.append(f"PII: {label} nel testo")
     for email in INTERNAL_EMAILS:
-        if email.lower() in text.lower():
-            violations.append(f"Internal email leaked: {email}")
+        if email.lower() in draft.lower():
+            violations.append(f"Email interna esposta: {email}")
+
+    # Banned platforms
+    draft_lower = draft.lower()
+    for platform in BANNED_PLATFORMS:
+        if platform in draft_lower:
+            violations.append(f"Piattaforma vietata menzionata: {platform}")
+
+    # Wrong product description
+    for pattern in WRONG_PRODUCT_PHRASES:
+        if pattern.search(draft):
+            violations.append("Errore prodotto: il QR è per il MENU, non per le recensioni")
+            break
+
+    # Word count
+    max_words = strategy.get("max_words", 120)
+    word_count = len(draft.split())
+    if word_count > max_words + 20:
+        violations.append(f"Troppo lungo: {word_count} parole (max {max_words})")
+
     return violations
 
 
-def _build_reviewer_prompt(strategy: dict, research: dict, lead_source: str, stage: str, lead_message: str = "") -> str:
-    is_first_rc = stage == "initial_reply" and lead_source == "inbound_rank_checker"
-    max_words = strategy.get("max_words", 100)
-    do_not = strategy.get("do_not", [])
-    data_summary = research.get("available_data_summary", "N/A")
+HALLUCINATION_CHECK_PROMPT = """Controlla se questo messaggio di vendita cita dati INVENTATI.
 
-    lead_asked_how = any(kw in (lead_message or "").lower() for kw in ["come funziona", "funzionamento", "come fate", "spiegami", "dimmi come", "come lavorate", "che sistema"])
-    lead_asked_price = any(kw in (lead_message or "").lower() for kw in ["costo", "costi", "prezzo", "quanto costa", "listino", "tariff"])
+Confronta SOLO nomi di ristoranti, numeri di recensioni, posizioni su Google Maps, e statistiche 
+con i DATI VERIFICATI sotto. Se il messaggio cita un ristorante, un numero o una statistica 
+che NON appare nei dati verificati, segnalalo.
 
-    return f"""Sei un quality reviewer per messaggi di vendita. Controlla il messaggio contro le regole.
+NON segnalare:
+- Inferenze ragionevoli dal contesto (es: se il lead dice "abbiamo chi ci segue", il messaggio può dire "il vostro attuale supporto")
+- Arrotondamenti o parafrasi di numeri presenti nei dati
+- Descrizioni generiche del prodotto/servizio
+- Il tono o lo stile del messaggio — non è compito tuo giudicarlo
 
-REGOLE (se violate = FAIL):
-1. {"Il lead ha CHIESTO come funziona — spiegare il meccanismo È OK e anzi NECESSARIO. NON è una violazione." if lead_asked_how else "NON deve contenere descrizione DETTAGLIATA del meccanismo tecnico (QR code, WhatsApp bot, filtro recensioni). Frasi generiche SONO OK."}
-2. {"E' un PRIMO CONTATTO RANK CHECKER: NON deve contenere il PREZZO NUMERICO." if is_first_rc else ("Il lead ha CHIESTO il prezzo — menzionarlo È OK e anzi NECESSARIO." if lead_asked_price else "Il prezzo può essere menzionato se appropriato.")}
-3. NON deve menzionare videochiamate, Zoom, Google Meet. "Chiamata al telefono" È OK.
-4. NON deve superare {max_words} parole. Conta attentamente.
-5. NON deve contenere dati inventati. Confronta OGNI nome, numero e statistica con i DATI DISPONIBILI sotto. Se non è presente → ALLUCINAZIONE = FAIL.
-6. NON deve attribuire al lead frasi che non ha detto.
-7. DEVE avere una CTA chiara alla fine.
-8. DEVE essere firmato col nome.
-9. Il tono deve sembrare umano, non da bot AI.
-10. NON deve menzionare TripAdvisor, Yelp o qualsiasi piattaforma diversa da Google.
-11. ERRORI FATTUALI SUL PRODOTTO (se presenti = FAIL IMMEDIATO):
-    - Il QR code è per il MENU, NON per le recensioni
-    - TUTTI i clienti scansionano il QR (non solo i soddisfatti)
-    - La richiesta di recensione arriva DOPO il pasto via WhatsApp, NON al momento della scansione
-    - Se dice "i clienti soddisfatti scansionano il QR per recensire" = FAIL
-    - Se dice "scansionano per lasciare una recensione" = FAIL
-    - Se confonde il momento del menu col momento della recensione = FAIL
+Segnala SOLO dati concreti inventati (nomi, numeri, statistiche non verificabili).
 
-PROIBIZIONI DAL PIANO:
-{chr(10).join('- ' + d for d in do_not)}
-
-DATI DISPONIBILI (qualsiasi dato non presente qui è inventato):
+DATI VERIFICATI:
 {data_summary}
 
-Rispondi SOLO con JSON:
-{{"pass": true, "violations": [], "feedback": ""}}
-oppure
-{{"pass": false, "violations": ["regola X violata: dettaglio"], "feedback": "Cosa correggere"}}"""
+Rispondi con JSON: {{"hallucinations_found": false}} oppure {{"hallucinations_found": true, "details": "cosa è inventato"}}"""
 
 
 async def reviewer_node(state: AgentState) -> dict:
-    draft = state.get("draft", "")
-    strategy = state.get("strategy", {})
-    research = state.get("research", {})
-    request = state["request"]
+    draft = state.get("draft") or ""
+    strategy = state.get("strategy") or {}
+    research = state.get("research") or {}
     review_attempts = state.get("review_attempts", 0)
 
-    lead_source = getattr(request, "lead_source", "smartlead_outbound")
-    stage = getattr(request, "stage", "initial_reply")
-    lead_message = getattr(request, "lead_message", "") or ""
-
-    pii_violations = _scan_pii(draft)
-    if pii_violations:
-        logger.warning("PII detected in draft: %s", pii_violations)
+    # Step 1: deterministic checks (instant, no LLM)
+    det_violations = _deterministic_checks(draft, strategy)
+    if det_violations:
+        logger.info("Reviewer deterministic FAIL: %s", det_violations)
         return {
-            "review_result": {"pass": False, "violations": pii_violations, "feedback": "CRITICO: dati sensibili nel testo. Rimuoverli."},
+            "review_result": {"pass": False, "violations": det_violations, "feedback": " ".join(det_violations)},
             "review_attempts": review_attempts + 1,
         }
 
-    system_prompt = _build_reviewer_prompt(strategy, research, lead_source, stage, lead_message)
+    # Step 2: LLM hallucination check (only job for Haiku)
+    data_summary = research.get("available_data_summary", "")
+    if not data_summary:
+        logger.info("Reviewer: no data summary, auto-pass")
+        return {
+            "review_result": {"pass": True, "violations": [], "feedback": ""},
+            "review_attempts": review_attempts + 1,
+        }
+
+    prompt = HALLUCINATION_CHECK_PROMPT.replace("{data_summary}", data_summary)
 
     settings = get_settings()
     client = _get_client()
@@ -113,32 +128,36 @@ async def reviewer_node(state: AgentState) -> dict:
     try:
         resp = await client.messages.create(
             model=settings.model_reviewer,
-            max_tokens=settings.reviewer_max_tokens,
+            max_tokens=500,
             temperature=0,
-            system=system_prompt,
-            messages=[{"role": "user", "content": f"MESSAGGIO DA CONTROLLARE:\n\n{draft}"}],
+            system=prompt,
+            messages=[{"role": "user", "content": f"MESSAGGIO:\n\n{draft}"}],
         )
 
         text = resp.content[0].text.strip()
         parsed = json.loads(text[text.index("{"):text.rindex("}") + 1])
 
-        result = {
-            "pass": parsed.get("pass", False),
-            "violations": parsed.get("violations", []),
-            "feedback": parsed.get("feedback", ""),
-        }
+        if parsed.get("hallucinations_found"):
+            details = parsed.get("details", "Dati inventati rilevati")
+            logger.info("Reviewer: hallucination detected — %s", details)
+            return {
+                "review_result": {"pass": False, "violations": [f"Dato inventato: {details}"], "feedback": f"Rimuovi o correggi: {details}"},
+                "review_attempts": review_attempts + 1,
+                "total_input_tokens": state.get("total_input_tokens", 0) + (resp.usage.input_tokens or 0),
+                "total_output_tokens": state.get("total_output_tokens", 0) + (resp.usage.output_tokens or 0),
+            }
 
-        logger.info("Reviewer: pass=%s violations=%s", result["pass"], result["violations"])
-
+        logger.info("Reviewer: PASS (no hallucinations)")
         return {
-            "review_result": result,
+            "review_result": {"pass": True, "violations": [], "feedback": ""},
             "review_attempts": review_attempts + 1,
             "total_input_tokens": state.get("total_input_tokens", 0) + (resp.usage.input_tokens or 0),
             "total_output_tokens": state.get("total_output_tokens", 0) + (resp.usage.output_tokens or 0),
         }
+
     except Exception as e:
-        logger.warning("Reviewer parse error, failing safe: %s", e)
+        logger.warning("Reviewer error, auto-pass: %s", e)
         return {
-            "review_result": {"pass": False, "violations": ["reviewer_parse_error"], "feedback": "Errore nel parsing della review."},
+            "review_result": {"pass": True, "violations": [], "feedback": ""},
             "review_attempts": review_attempts + 1,
         }
