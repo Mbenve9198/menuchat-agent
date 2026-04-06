@@ -171,6 +171,8 @@ class AgentResponse(BaseModel):
     new_stage: str | None = None
     extracted_insights: Insights = Field(default_factory=Insights)
 
+    research_summary: str | None = None
+
     thinking: str | None = None
     model_used: str | None = None
     total_tokens: int = 0

@@ -75,6 +75,9 @@ async def build_response_node(state: AgentState) -> dict:
     output_t = state.get("total_output_tokens", 0)
     cost = input_t * COST_PER_INPUT_TOKEN["opus"] + output_t * COST_PER_OUTPUT_TOKEN["opus"]
 
+    research = state.get("research") or {}
+    research_summary = research.get("available_data_summary", "")
+
     response = AgentResponse(
         action=action,
         draft=draft,
@@ -83,6 +86,7 @@ async def build_response_node(state: AgentState) -> dict:
         tool_intents=[ToolIntent(**ti) for ti in tool_intents],
         new_stage=_infer_stage(strategy, action),
         extracted_insights=Insights(),
+        research_summary=research_summary[:3000] if research_summary else None,
         thinking=strategy.get("thinking", "")[:2000],
         model_used="opus-4.6",
         total_tokens=input_t + output_t,
