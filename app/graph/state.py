@@ -26,6 +26,7 @@ class ResearchData(TypedDict, total=False):
     projected_reviews_12_months: int | None
     has_digital_menu: bool | None
     available_data_summary: str
+    crm_context: str | None
 
 
 class AgentState(TypedDict, total=False):

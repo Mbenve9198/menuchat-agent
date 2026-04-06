@@ -330,7 +330,8 @@ async def researcher_node(state: AgentState) -> dict:
             logger.info("Researcher ended without calling done (round %d)", round_num + 1)
             break
 
-    research = _assemble_research(all_results, done_result, contact, rc_data)
+    crm_context = _build_crm_context(request)
+    research = _assemble_research(all_results, done_result, contact, rc_data, crm_context)
 
     logger.info(
         "Research complete: tools_called=%s rounds=%d",
@@ -345,11 +346,85 @@ async def researcher_node(state: AgentState) -> dict:
     }
 
 
+def _build_crm_context(request) -> str | None:
+    """Build a text summary of CRM enrichment data to pass through the graph."""
+    enrichment = getattr(request, "crm_enrichment", None)
+    if not enrichment:
+        return None
+
+    parts = []
+    task_type = getattr(request, "task_type", "")
+    days = getattr(request, "days_since_last_contact", None)
+
+    if task_type:
+        parts.append(f"TIPO AZIONE: {task_type}")
+    if days:
+        parts.append(f"GIORNI DALL'ULTIMO CONTATTO: {days}")
+
+    contact = getattr(request, "contact", None)
+    if contact:
+        if contact.status:
+            parts.append(f"STATO CRM: {contact.status}")
+        if contact.callback_note:
+            parts.append(f"CALLBACK: {contact.callback_note}")
+        if contact.notes:
+            parts.append(f"NOTE CONTATTO: {contact.notes}")
+
+    if enrichment.conversation_summary:
+        parts.append(f"\nRIASSUNTO CONVERSAZIONE:\n{enrichment.conversation_summary}")
+
+    if enrichment.human_notes:
+        parts.append(f"\nNOTE TEAM VENDITE:")
+        for n in enrichment.human_notes:
+            date = str(n.get("date", ""))[:10]
+            parts.append(f"  [{date}] {n.get('note', '')}")
+
+    if enrichment.call_history:
+        parts.append(f"\nSTORICO CHIAMATE ({len(enrichment.call_history)}):")
+        for call in enrichment.call_history:
+            date = str(call.date)[:10] if call.date else "N/A"
+            dur = call.duration_seconds
+            dur_str = f"{dur // 60}:{dur % 60:02d}" if dur else "0:00"
+            line = f"  [{date}] {dur_str} | esito: {call.outcome or 'N/A'}"
+            parts.append(line)
+            if call.notes:
+                parts.append(f"    📝 {call.notes}")
+            if call.transcript:
+                parts.append(f"    🎙️ TRASCRIZIONE:\n{_indent(call.transcript, 6)}")
+
+    if enrichment.contact_notes:
+        parts.append(f"\nNOTE CRM: {enrichment.contact_notes}")
+
+    if enrichment.activity_summary:
+        s = enrichment.activity_summary
+        parts.append(f"\nATTIVITÀ: {s.get('total_activities', 0)} totali, {s.get('calls_made', 0)} chiamate ({s.get('calls_answered', '?')} risposte)")
+        if s.get("status_changes"):
+            parts.append(f"  Cambi stato: {' → '.join(s['status_changes'])}")
+
+    msgs = getattr(request, "messages", []) or []
+    if msgs:
+        parts.append(f"\nSTORICO MESSAGGI ({len(msgs)}):")
+        for m in msgs[-6:]:
+            role = m.role if hasattr(m, "role") else m.get("role", "?")
+            content = m.content if hasattr(m, "content") else m.get("content", "")
+            parts.append(f"  [{role.upper()}]: {content[:200]}")
+
+    prev = getattr(request, "previous_insights", None)
+    if prev:
+        if prev.get("objections"):
+            parts.append(f"\nOBIEZIONI PRECEDENTI: {', '.join(prev['objections'])}")
+        if prev.get("pain_points"):
+            parts.append(f"PAIN POINTS PRECEDENTI: {', '.join(prev['pain_points'])}")
+
+    return "\n".join(parts) if parts else None
+
+
 def _assemble_research(
     all_results: dict[str, list],
     done_result: dict | None,
     contact: dict,
     rc_data: dict,
+    crm_context: str | None = None,
 ) -> ResearchData:
     """Assemble a ResearchData from all accumulated tool results."""
 
@@ -446,6 +521,7 @@ def _assemble_research(
         projected_reviews_12_months=proj_12m,
         has_digital_menu=rc_data.get("hasDigitalMenu"),
         available_data_summary=data_summary,
+        crm_context=crm_context,
     )
 
 

@@ -90,6 +90,10 @@ Se il lead indica un periodo futuro (es: "riapriamo a maggio"):
 def build_strategist_user_input(lead_message: str, research: dict, conversation_context: str, episodic_examples: list[dict]) -> str:
     parts = [f'MESSAGGIO DEL LEAD:\n"{lead_message}"\n']
 
+    crm_context = research.get("crm_context")
+    if crm_context:
+        parts.append(f"CONTESTO CRM — STORICO RELAZIONE CON QUESTO LEAD:\n{crm_context}\n")
+
     data_summary = research.get("available_data_summary", "")
     if data_summary:
         parts.append(f"DATI RACCOLTI DAL RICERCATORE:\n{data_summary}")

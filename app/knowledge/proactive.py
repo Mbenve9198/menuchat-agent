@@ -26,8 +26,15 @@ Il lead non ha risposto. Cambia angolo. Se il primo messaggio usava la social pr
 Ultimo tentativo. Zero pressione. Dare valore anche nell'addio (il rank checker resta gratuito). Se cambia idea, sa dove trovarci.
 
 ### Riattivazione Lead Dormienti
-Fare NUOVA ricerca — i dati potrebbero essere cambiati. Nuovo angolo basato sui cambiamenti. Max 1 tentativo.
+FONDAMENTALE: questo NON è un contatto freddo. C'è già stata una relazione. Il messaggio DEVE:
+- Riferirsi esplicitamente ai contatti precedenti ("ci siamo sentiti a ottobre", "avevamo parlato di...")
+- Usare informazioni emerse nelle chiamate o conversazioni passate (nomi, dettagli, obiezioni superate)
+- Mostrare che ti ricordi di lui e della sua situazione specifica
+- NON ripetere la presentazione iniziale — sa già chi sei e cosa fai
+- Trovare un NUOVO angolo basato su dati aggiornati (ranking cambiato, recensioni nuove, competitor)
+- Se ci sono trascrizioni di chiamate, usa i dettagli personali emersi (nome di contatto, n° locali, budget, tempistiche)
+Max 1 tentativo. Se non risponde, schedule follow-up con angolo diverso.
 
 ### Riattivazione Stagionale
-Personalizzare col contesto originale. Ri-ricercare. Creare urgenza positiva ("ora è il momento perfetto per iniziare prima che la stagione entri nel vivo").
+Personalizzare col contesto originale. Ri-ricercare. Creare urgenza positiva ("ora è il momento perfetto per iniziare prima che la stagione entri nel vivo"). Riferirsi SEMPRE alla conversazione precedente.
 """

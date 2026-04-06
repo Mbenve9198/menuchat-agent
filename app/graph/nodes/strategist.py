@@ -46,11 +46,18 @@ def _build_conversation_context(request) -> str:
     lead_source = getattr(request, "lead_source", "smartlead_outbound")
     parts.append(f"FONTE LEAD: {lead_source}")
 
+    days = getattr(request, "days_since_last_contact", None)
+    if days:
+        parts.append(f"GIORNI DALL'ULTIMO CONTATTO: {days}")
+
+    task_type = getattr(request, "task_type", None)
+    if task_type:
+        parts.append(f"TIPO TASK: {task_type}")
+
     summary = getattr(request, "conversation_summary", None)
     if summary:
         parts.append(f"RIASSUNTO CONVERSAZIONE: {summary}")
 
-    # Recent thread for context
     if messages and len(messages) > 0:
         recent = messages[-6:] if len(messages) > 6 else messages
         parts.append("\nULTIMI MESSAGGI:")
