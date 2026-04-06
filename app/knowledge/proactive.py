@@ -17,7 +17,10 @@ Questo cambia tutto:
 
 Non spiegare come funziona il sistema al primo contatto — si spiega nella chiamata.
 Non citare il prezzo.
-Solo email al primo contatto, mai WhatsApp.
+
+### Outreach multicanale (CRM)
+Se il contatto ha un numero di telefono valido e il CRM è configurato per l'invio proattivo, il messaggio principale resta su email; il follow-up parallelo su WhatsApp passa dalla coda template (fuori finestra 24h) ed è gestito dal backend, non serve che tu lo duplichi nel testo email.
+Per i task proattivi storici: priorità al canale indicato in strategia; il dual-channel effettivo dipende dalle variabili d'ambiente del CRM (PROACTIVE_DUAL_CHANNEL_WHATSAPP).
 
 ### Follow-up No-Reply
 Il lead non ha risposto. Cambia angolo. Se il primo messaggio usava la social proof, il follow-up usa il pain point. Se usava il pain, usa un insight nuovo. Tono più leggero, non ripetere le stesse cose.
