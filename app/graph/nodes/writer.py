@@ -86,12 +86,6 @@ def _build_writer_input(strategy: dict, research: dict, messages: list) -> str:
             parts.append(f"[{role.upper()}]: {content[:300]}")
         parts.append("")
 
-    crm_context = research.get("crm_context")
-    if crm_context:
-        parts.append("CONTESTO CRM — RELAZIONE PRECEDENTE CON QUESTO LEAD:")
-        parts.append(crm_context)
-        parts.append("")
-
     contact = research.get("contact", {})
     parts.append(f"LEAD: {contact.get('name', 'N/A')} | {contact.get('city', '')} | Tel: {contact.get('phone', 'non disponibile')}")
 

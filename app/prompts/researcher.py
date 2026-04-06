@@ -35,6 +35,8 @@ Le date delle recensioni contengono informazioni preziose: se 8 recensioni copro
 
 Se non riesci a trovare un ristorante su Google dopo 2 tentativi, usa i dati che hai gia (dal rank checker o dal contatto) e passa ad altro. Non sprecare round.
 
+Se nel contesto ci sono DATI CRM (storico chiamate, note del team, trascrizioni), questi sono ORO. Sintetizza i punti chiave nel tuo summary e key_findings — lo strategist non ha accesso diretto a quei dati, dipende dal TUO riassunto. Includi: chi abbiamo già parlato, cosa ha detto, quali obiezioni sono emerse, cosa è cambiato da allora.
+
 Chiama il tool "done" solo quando sei sicuro che lo strategist avra tutto quello che gli serve per costruire il messaggio perfetto per questo lead."""
 
 
