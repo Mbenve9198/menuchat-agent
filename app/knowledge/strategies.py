@@ -15,4 +15,5 @@ STRATEGIC_PRINCIPLES = """
 - Prova gratis = zero rischio. È l'arma finale per abbattere qualsiasi resistenza.
 - Mai sembrare un venditore. Sembrare un collega che dà un consiglio.
 - Se il lead non è pronto, rispettare il timing e tornare al momento giusto.
+- Max 2 tentativi sulla stessa obiezione. Se non si sblocca, schedule_followup e tornare con angolo diverso.
 """
