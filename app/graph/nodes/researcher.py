@@ -104,9 +104,24 @@ def _build_user_context(request, contact: dict, rc_data: dict) -> str:
     if contact.get("website"):
         parts.append(f"- Sito: {contact['website']}")
     parts.append(f"- Fonte: {contact.get('source', 'N/A')}")
+    if contact.get("contact_person"):
+        parts.append(f"- Persona di contatto: {contact['contact_person']}")
+    if contact.get("place_id"):
+        parts.append(f"- Google Place ID: {contact['place_id']} (usa questo per cercare su Google Maps, e molto piu preciso del nome)")
+    if contact.get("coordinates"):
+        coords = contact["coordinates"]
+        lat = coords.get("lat") or coords.get("latitude")
+        lng = coords.get("lng") or coords.get("longitude")
+        if lat and lng:
+            parts.append(f"- Coordinate: lat={lat}, lng={lng} (usa queste per il rank check)")
+    if contact.get("call_requested"):
+        pref = contact.get("call_preference", "")
+        parts.append(f"- IL LEAD HA GIA RICHIESTO UNA CHIAMATA (preferenza: {pref})")
 
     if rc_data:
-        parts.append("\nDATI RANK CHECKER (il lead ha fatto un audit sul nostro sito):")
+        parts.append("\nDATI RANK CHECKER (il lead ha fatto un audit sul nostro sito — questi dati li ha GIA VISTI):")
+        if rc_data.get("placeId"):
+            parts.append(f"- Place ID: {rc_data['placeId']}")
         if rc_data.get("keyword"):
             parts.append(f"- Keyword cercata: \"{rc_data['keyword']}\"")
         ranking = rc_data.get("ranking", {})
@@ -118,8 +133,21 @@ def _build_user_context(request, contact: dict, rc_data: dict) -> str:
             parts.append(f"- Clienti persi/settimana stimati: ~{ranking['estimatedLostCustomers']}")
         if rc_data.get("dailyCovers"):
             parts.append(f"- Coperti/giorno dichiarati: {rc_data['dailyCovers']}")
+        if rc_data.get("estimatedMonthlyReviews"):
+            parts.append(f"- Stima recensioni mensili con MenuChat: ~{rc_data['estimatedMonthlyReviews']}")
         if rc_data.get("hasDigitalMenu") is not None:
-            parts.append(f"- Ha menu digitale: {'sì' if rc_data['hasDigitalMenu'] else 'no'}")
+            parts.append(f"- Ha menu digitale: {'si' if rc_data['hasDigitalMenu'] else 'no'}")
+
+        full = ranking.get("fullResults", {})
+        comps = full.get("competitors", [])
+        if comps:
+            parts.append("- Competitor trovati nel rank check:")
+            for c in comps[:5]:
+                parts.append(f"  * {c.get('name')}: pos {c.get('rank')}, {c.get('rating')} stelle, {c.get('reviews')} rec, place_id: {c.get('place_id')}")
+
+        main_coords = full.get("mainResult", {}).get("coordinates", {})
+        if main_coords.get("lat") and main_coords.get("lng"):
+            parts.append(f"- Coordinate dal rank check: lat={main_coords['lat']}, lng={main_coords['lng']}")
 
     smartlead = getattr(request, "smartlead_data", None)
     if smartlead and getattr(smartlead, "campaign_id", None):
