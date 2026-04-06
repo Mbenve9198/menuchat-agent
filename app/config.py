@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     postgres_url: str = "postgresql://agent:agent_dev_password@localhost:5432/agent_state"
     qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""
+    qdrant_collection_prefix: str = "menuchat"
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
     host: str = "0.0.0.0"
     port: int = 8100

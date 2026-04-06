@@ -101,6 +101,7 @@ async def run_reactive(request: AgentRequest) -> AgentResponse:
         "review_result": None,
         "review_attempts": 0,
         "episodic_examples": [],
+        "contact_memories": [],
         "tool_intents": [],
         "response": None,
         "total_input_tokens": 0,

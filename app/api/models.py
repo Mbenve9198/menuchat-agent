@@ -123,6 +123,20 @@ class ResumeRequest(BaseModel):
     updated_context: dict = Field(default_factory=dict)
 
 
+class FeedbackRequest(BaseModel):
+    """Human feedback on an agent draft — used to build episodic memory."""
+    conversation_id: str
+    contact_email: str
+    agent_draft: str
+    final_sent: str | None = None
+    action: str  # approved | modified | discarded
+    lead_profile: dict = Field(default_factory=dict)
+    conversation_context: dict = Field(default_factory=dict)
+    modifications: dict | None = None
+    discard_reason: str | None = None
+    discard_notes: str | None = None
+
+
 # ── Tool Intents (agent -> CRM) ───────────────────────────────────
 
 class ToolIntent(BaseModel):

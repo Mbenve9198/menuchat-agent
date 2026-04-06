@@ -87,7 +87,13 @@ Se il lead indica un periodo futuro (es: "riapriamo a maggio"):
 """
 
 
-def build_strategist_user_input(lead_message: str, research: dict, conversation_context: str, episodic_examples: list[dict]) -> str:
+def build_strategist_user_input(
+    lead_message: str,
+    research: dict,
+    conversation_context: str,
+    episodic_examples: list[dict],
+    contact_memories: list[dict] | None = None,
+) -> str:
     parts = [f'MESSAGGIO DEL LEAD:\n"{lead_message}"\n']
 
     crm_context = research.get("crm_context")
@@ -113,8 +119,50 @@ def build_strategist_user_input(lead_message: str, research: dict, conversation_
     parts.append(f"\n{conversation_context}")
 
     if episodic_examples:
-        parts.append("\nEPISODI VINCENTI SIMILI:")
-        for ep in episodic_examples[:3]:
-            parts.append(f"- {ep.get('objection', '?')} → {ep.get('strategy', '?')} → {ep.get('outcome', '?')}")
+        parts.append("\nMEMORIA EPISODICA — ESPERIENZE PASSATE CON LEAD SIMILI:")
+        for i, ep in enumerate(episodic_examples[:3], 1):
+            outcome = ep.get("outcome", "?")
+            strategy = ep.get("strategy", "?")
+            lead_p = ep.get("lead_profile", {})
+            lead_desc = f"{lead_p.get('category', '?')} ({lead_p.get('city', '?')})"
+
+            parts.append(f"\n  Episodio {i} [{outcome.upper()}] — {lead_desc}:")
+            parts.append(f"    Strategia: {strategy}")
+            if ep.get("situation"):
+                parts.append(f"    Situazione: {ep['situation'][:200]}")
+            if ep.get("objections"):
+                parts.append(f"    Obiezioni: {', '.join(ep['objections'][:3])}")
+
+            edits = ep.get("human_edits", {})
+            if outcome == "modified" and edits:
+                if edits.get("modifications"):
+                    mods = edits["modifications"]
+                    if mods.get("toneChange"):
+                        parts.append(f"    Correzione tono: {mods['toneChange']}")
+                    if mods.get("addedContent"):
+                        parts.append(f"    Aggiunto: {mods['addedContent'][:150]}")
+                    if mods.get("removedContent"):
+                        parts.append(f"    Rimosso: {mods['removedContent'][:150]}")
+            elif outcome == "discarded" and edits:
+                reason = edits.get("discard_reason", "")
+                notes = edits.get("discard_notes", "")
+                if reason:
+                    parts.append(f"    Motivo scarto: {reason}")
+                if notes:
+                    parts.append(f"    Note: {notes[:150]}")
+
+    if contact_memories:
+        parts.append("\nMEMORIA AGENTE — LE TUE OSSERVAZIONI PRECEDENTI SU QUESTO LEAD:")
+        for mem in contact_memories[:5]:
+            date = mem.get("stored_at", "")[:10]
+            obs = mem.get("observation", "")
+            strat = mem.get("strategy_used", "")
+            outcome = mem.get("outcome", "")
+            line = f"  [{date}] {obs[:300]}"
+            if strat:
+                line += f" (strategia: {strat[:80]})"
+            if outcome:
+                line += f" → {outcome}"
+            parts.append(line)
 
     return "\n".join(parts)

@@ -57,6 +57,7 @@ class AgentState(TypedDict, total=False):
 
     # Memory
     episodic_examples: list[dict]
+    contact_memories: list[dict]
 
     # Tool intents accumulated during the run
     tool_intents: list[dict]

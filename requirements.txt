@@ -9,8 +9,8 @@ langgraph>=0.3.0
 langgraph-checkpoint-postgres>=2.0.0
 
 # Memory
-mem0ai>=0.1.40
 qdrant-client>=1.13.0
+fastembed>=0.4.0
 
 # Prompt optimization (Phase 4)
 dspy>=2.6.0

@@ -87,7 +87,8 @@ async def strategist_node(state: AgentState) -> dict:
     if feedback:
         system_prompt += f"\n\nATTENZIONE — IL CRITIC HA BOCCIATO LA STRATEGIA PRECEDENTE:\n{feedback}\nCorreggi i problemi segnalati."
 
-    user_input = build_strategist_user_input(lead_message, research, conversation_context, episodic)
+    contact_mems = state.get("contact_memories", [])
+    user_input = build_strategist_user_input(lead_message, research, conversation_context, episodic, contact_mems)
 
     settings = get_settings()
     client = _get_client()

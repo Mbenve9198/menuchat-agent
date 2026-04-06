@@ -1,11 +1,13 @@
 """
 Build Response node — assembles the final AgentResponse from graph state.
+Also stores per-contact memory observations extracted from the strategist's reasoning.
 """
 
 import logging
 
 from app.api.models import AgentResponse, ToolIntent, Insights, StrategyOutput
 from app.graph.state import AgentState
+from app.memory.manager import store_run_memory
 
 logger = logging.getLogger("agent-service.nodes.response")
 
@@ -87,7 +89,51 @@ async def build_response_node(state: AgentState) -> dict:
         estimated_cost_usd=round(cost, 4),
     )
 
+    await _store_contact_observation(state, strategy, action)
+
     return {"response": response}
+
+
+async def _store_contact_observation(state: AgentState, strategy: dict, action: str):
+    """Extract and store the agent's observation about this contact."""
+    try:
+        request = state["request"]
+        contact_email = request.contact.email
+        reasoning = strategy.get("reasoning", "")
+        approach = strategy.get("strategy") or strategy.get("approach", "")
+
+        if not reasoning and not approach:
+            return
+
+        observation_parts = []
+        if approach:
+            observation_parts.append(f"Strategia: {approach}")
+        if reasoning:
+            observation_parts.append(f"Analisi: {reasoning[:500]}")
+
+        tone = strategy.get("tone_description") or strategy.get("tone", "")
+        if tone:
+            observation_parts.append(f"Tono scelto: {tone}")
+
+        do_not = strategy.get("do_not", [])
+        if do_not:
+            observation_parts.append(f"Da evitare: {', '.join(do_not[:3])}")
+
+        observation = " | ".join(observation_parts)
+
+        conversation_id = getattr(request, "conversation_id", "") or ""
+        task_type = getattr(request, "task_type", "") or getattr(request, "stage", "")
+
+        await store_run_memory(
+            contact_email=contact_email,
+            observation=observation,
+            strategy_used=approach,
+            outcome=action,
+            conversation_id=conversation_id,
+            task_type=task_type,
+        )
+    except Exception as e:
+        logger.warning("Failed to store contact observation (non-blocking): %s", e)
 
 
 def _infer_stage(strategy: dict, action: str) -> str | None:

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import get_settings
-from app.db import init_db, close_db
+from app.db import init_db, init_vector_store, close_db
 from app.api.routes import router
 
 settings = get_settings()
@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Agent Service — initializing databases")
     await init_db()
     logger.info("PostgreSQL checkpointer ready")
+    await init_vector_store()
     yield
     logger.info("Shutting down Agent Service")
     await close_db()

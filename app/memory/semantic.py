@@ -1,1 +1,1 @@
-"""Semantic memory via Qdrant. TODO Phase 3."""
+"""Semantic memory — replaced by qdrant_store.py + episodic.py + contact_memory.py."""

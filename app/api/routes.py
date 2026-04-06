@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from app.api.models import (
     AgentRequest,
     AgentResponse,
+    FeedbackRequest,
     ProactiveRequest,
     ResumeRequest,
 )
@@ -99,4 +100,43 @@ async def resume_workflow(request: ResumeRequest):
         return result
     except Exception as e:
         logger.exception("resume_workflow failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/memory/feedback")
+async def store_feedback(request: FeedbackRequest):
+    """Store human feedback as an episodic memory for future learning."""
+    logger.info(
+        "store_feedback | conv=%s action=%s contact=%s",
+        request.conversation_id, request.action, request.contact_email,
+    )
+
+    try:
+        from app.memory.manager import store_feedback
+
+        ctx = request.conversation_context
+        episode = {
+            "lead_profile": request.lead_profile,
+            "situation": ctx.get("leadLastMessage", ""),
+            "objections": ctx.get("objections", []),
+            "task_type": ctx.get("source", ""),
+            "stage": ctx.get("stage", ""),
+            "strategy": "",
+            "strategy_reasoning": "",
+            "draft": request.agent_draft,
+            "outcome": request.action,
+            "human_edits": {
+                "final_sent": request.final_sent,
+                "modifications": request.modifications,
+                "discard_reason": request.discard_reason,
+                "discard_notes": request.discard_notes,
+            },
+            "conversation_id": request.conversation_id,
+            "contact_email": request.contact_email,
+        }
+
+        point_id = await store_feedback(episode)
+        return {"status": "stored", "point_id": point_id}
+    except Exception as e:
+        logger.exception("store_feedback failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
