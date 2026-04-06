@@ -1,48 +1,65 @@
 """
-Embedding via HuggingFace Inference API.
-Zero local RAM — same multilingual model, runs server-side on HF.
-Requires HF_TOKEN env var (free at https://huggingface.co/settings/tokens).
+Embedding via Hugging Face Inference Providers (feature_extraction).
+
+Richiede HF_TOKEN con permesso «Make calls to Inference Providers» (token fine-grained):
+https://huggingface.co/settings/tokens
 """
+
+from __future__ import annotations
 
 import logging
 from functools import lru_cache
 
-import httpx
+from huggingface_hub import InferenceClient
 
 from app.config import get_settings
 
 logger = logging.getLogger("agent-service.memory.embeddings")
 
-HF_ROUTER = "https://router.huggingface.co/hf-inference/models/{model}"
-
 EMBEDDING_DIM = 384
 
-_http_client: httpx.Client | None = None
+_inference_client: InferenceClient | None = None
 
 
-def _get_http_client() -> httpx.Client:
-    global _http_client
-    if _http_client is None:
+def _get_inference_client() -> InferenceClient:
+    global _inference_client
+    if _inference_client is None:
         settings = get_settings()
-        headers = {}
-        if settings.hf_token:
-            headers["Authorization"] = f"Bearer {settings.hf_token}"
-        _http_client = httpx.Client(timeout=30, headers=headers)
-    return _http_client
+        token = (settings.hf_token or "").strip()
+        if not token:
+            raise RuntimeError(
+                "HF_TOKEN non configurato. Crea un token su "
+                "https://huggingface.co/settings/tokens con permesso "
+                "«Make calls to Inference Providers», poi imposta HF_TOKEN su Render."
+            )
+        _inference_client = InferenceClient(token=token)
+    return _inference_client
+
+
+def _vector_to_list(arr) -> list[float]:
+    """Normalizza output di feature_extraction (ndarray 1D/2D o liste annidate) in list[float]."""
+    if hasattr(arr, "shape"):
+        if len(arr.shape) == 2:
+            arr = arr[0]
+        return [float(x) for x in arr.ravel()]
+    if isinstance(arr, list):
+        if arr and isinstance(arr[0], list):
+            return [float(x) for x in arr[0]]
+        return [float(x) for x in arr]
+    raise TypeError(f"Unexpected embedding type: {type(arr)}")
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
+    if not texts:
+        return []
     settings = get_settings()
-    url = HF_ROUTER.format(model=settings.embedding_model)
-    client = _get_http_client()
-
-    resp = client.post(url, json={"inputs": texts, "options": {"wait_for_model": True}})
-    resp.raise_for_status()
-    vectors = resp.json()
-
-    if isinstance(vectors[0], list) and isinstance(vectors[0][0], list):
-        return [v[0] for v in vectors]
-    return vectors
+    model = settings.embedding_model
+    client = _get_inference_client()
+    out: list[list[float]] = []
+    for t in texts:
+        arr = client.feature_extraction(t, model=model)
+        out.append(_vector_to_list(arr))
+    return out
 
 
 def embed_single(text: str) -> list[float]:

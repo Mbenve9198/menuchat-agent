@@ -2,7 +2,9 @@
 Integration test for the agent memory system.
 Uses Qdrant in-memory mode (no Docker/server needed).
 
-Run with: python -m pytest tests/test_memory_system.py -v -s
+Richiede HF_TOKEN (Inference Providers) per gli embedding reali.
+
+Run with: HF_TOKEN=hf_... python -m pytest tests/test_memory_system.py -v -s
 """
 
 import asyncio
@@ -12,6 +14,12 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+if not os.environ.get("HF_TOKEN"):
+    pytest.skip(
+        "Imposta HF_TOKEN (token HF con permesso Inference Providers) per i test memoria",
+        allow_module_level=True,
+    )
 
 
 @pytest.fixture(scope="session", autouse=True)

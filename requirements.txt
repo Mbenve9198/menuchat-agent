@@ -10,6 +10,7 @@ langgraph-checkpoint-postgres>=2.0.0
 
 # Memory
 qdrant-client>=1.13.0
+huggingface_hub>=0.26.0
 
 # Prompt optimization (Phase 4)
 dspy>=2.6.0

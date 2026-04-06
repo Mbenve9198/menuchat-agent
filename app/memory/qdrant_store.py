@@ -15,6 +15,7 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     MatchValue,
+    PayloadSchemaType,
     PointStruct,
     VectorParams,
 )
@@ -46,6 +47,22 @@ def get_qdrant_client() -> QdrantClient:
     return _client
 
 
+def _ensure_keyword_index(client: QdrantClient, collection_name: str, field: str) -> None:
+    """Qdrant Cloud richiede indice payload per filtri su campo keyword."""
+    try:
+        client.create_payload_index(
+            collection_name=collection_name,
+            field_name=field,
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        logger.info("Created payload index %s on %s", field, collection_name)
+    except Exception as e:
+        msg = str(e).lower()
+        if any(x in msg for x in ("already exists", "duplicate", "409", "already been created")):
+            return
+        logger.warning("Payload index %s on %s: %s", field, collection_name, e)
+
+
 async def init_collections():
     """Create collections if they don't exist. Called at startup."""
     client = get_qdrant_client()
@@ -62,6 +79,8 @@ async def init_collections():
             logger.info("Created Qdrant collection: %s (dim=%d)", col, dim)
         else:
             logger.info("Qdrant collection exists: %s", col)
+
+    _ensure_keyword_index(client, _collection_name(CONTACT_MEMORIES), "contact_email")
 
 
 def upsert_point(collection: str, vector: list[float], payload: dict, point_id: str | None = None) -> str:
