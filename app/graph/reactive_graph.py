@@ -1,6 +1,7 @@
 """
 Reactive LangGraph — responds to lead messages.
-Full pipeline: complexity_router → researcher → memory → strategist → critic → writer → reviewer
+Pipeline: researcher → memory → strategist → critic → writer → reviewer
+The researcher is autonomous and decides what to search (or not) based on the situation.
 """
 
 import logging
@@ -11,7 +12,6 @@ from langgraph.graph import StateGraph, END
 from app.api.models import AgentRequest, AgentResponse, ResumeRequest
 from app.db import get_checkpointer
 from app.graph.state import AgentState
-from app.graph.nodes.complexity_router import complexity_router_node
 from app.graph.nodes.researcher import researcher_node
 from app.graph.nodes.memory_recall import memory_recall_node
 from app.graph.nodes.strategist import strategist_node
@@ -24,12 +24,8 @@ from app.graph.nodes.build_response import build_response_node
 logger = logging.getLogger("agent-service.graph.reactive")
 
 
-def _route_by_complexity(state: AgentState) -> str:
-    return "researcher" if state.get("complexity") == "complex" else "strategist"
-
-
 def _route_after_strategy(state: AgentState) -> str:
-    strategy = state.get("strategy", {})
+    strategy = state.get("strategy") or {}
     if strategy.get("hibernate"):
         return "hibernate"
     if strategy.get("escalate_human"):
@@ -46,7 +42,7 @@ def _route_strategy_review(state: AgentState) -> str:
 
 
 def _route_review_result(state: AgentState) -> str:
-    review = state.get("review_result", {})
+    review = state.get("review_result") or {}
     if review.get("pass"):
         return "build_response"
     if state.get("review_attempts", 0) >= 2:
@@ -57,7 +53,6 @@ def _route_review_result(state: AgentState) -> str:
 def build_reactive_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
-    graph.add_node("complexity_router", complexity_router_node)
     graph.add_node("researcher", researcher_node)
     graph.add_node("memory_recall", memory_recall_node)
     graph.add_node("strategist", strategist_node)
@@ -67,12 +62,7 @@ def build_reactive_graph() -> StateGraph:
     graph.add_node("hibernate", hibernate_node)
     graph.add_node("build_response", build_response_node)
 
-    graph.set_entry_point("complexity_router")
-
-    graph.add_conditional_edges("complexity_router", _route_by_complexity, {
-        "researcher": "researcher",
-        "strategist": "strategist",
-    })
+    graph.set_entry_point("researcher")
 
     graph.add_edge("researcher", "memory_recall")
     graph.add_edge("memory_recall", "strategist")
@@ -123,7 +113,6 @@ async def run_reactive(request: AgentRequest) -> AgentResponse:
         "request": request,
         "request_type": "reactive",
         "thread_id": thread_id,
-        "complexity": "complex",
         "strategy": None,
         "strategy_approved": False,
         "strategy_feedback": None,
