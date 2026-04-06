@@ -96,8 +96,8 @@ def _build_writer_input(strategy: dict, research: dict, messages: list) -> str:
 
 async def writer_node(state: AgentState) -> dict:
     request = state["request"]
-    strategy = state.get("strategy", {})
-    research = state.get("research", {})
+    strategy = state.get("strategy") or {}
+    research = state.get("research") or {}
     review_feedback = state.get("review_result", {}).get("feedback") if state.get("review_result") else None
     review_attempts = state.get("review_attempts", 0)
 

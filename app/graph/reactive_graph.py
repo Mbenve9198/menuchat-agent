@@ -25,7 +25,7 @@ logger = logging.getLogger("agent-service.graph.reactive")
 
 
 def _route_by_complexity(state: AgentState) -> str:
-    return "researcher" if state.get("complexity") == "complex" else "writer"
+    return "researcher" if state.get("complexity") == "complex" else "strategist"
 
 
 def _route_after_strategy(state: AgentState) -> str:
@@ -71,7 +71,7 @@ def build_reactive_graph() -> StateGraph:
 
     graph.add_conditional_edges("complexity_router", _route_by_complexity, {
         "researcher": "researcher",
-        "writer": "writer",
+        "strategist": "strategist",
     })
 
     graph.add_edge("researcher", "memory_recall")

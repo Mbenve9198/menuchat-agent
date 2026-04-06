@@ -16,7 +16,8 @@ Struttura del messaggio:
    Se posizione bassa: "chi cerca '{keyword}' vede prima {competitor}"
    Se rating sotto 4.5: "con {rating} stelle, i clienti scelgono chi ha rating più alto"
 3. DREAM OUTCOME: Stima concreta basata sui coperti.
-   "Con {coperti} coperti/giorno, in 2 settimane puoi raccogliere ~{stima} recensioni"
+   "Con il sistema che abbiamo inventato e i {coperti} coperti/giorno che hai tra un anno puoi aver raccolto 600-1200 recensioni (dipende dai coperti) e aver lasciato indietro tutti i competitor, prendendoti tutto il traffico proveniente da google maps. 
+   Per chi ha fatto il nostro audit offriamo 2 settimane di prova gratuita dove puoi raccogliere ~{stima} recensioni,
 4. SOCIAL PROOF: Cliente simile con dati REALI.
 5. CTA: Conferma numero + 5 minuti per parlare della prova gratuita.
 
