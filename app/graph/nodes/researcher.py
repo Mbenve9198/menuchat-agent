@@ -18,7 +18,7 @@ from app.tools.smartlead_client import fetch_message_history
 
 logger = logging.getLogger("agent-service.nodes.researcher")
 
-MAX_ROUNDS = 6
+MAX_ROUNDS = 10
 
 _client: anthropic.AsyncAnthropic | None = None
 

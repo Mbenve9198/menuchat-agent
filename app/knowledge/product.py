@@ -85,4 +85,6 @@ Se il lead NON chiede come funziona, resta generico: "un sistema automatico per 
 - NON proporre MAI videochiamate, Google Meet, Zoom — solo CHIAMATE AL CELLULARE, 5-10 minuti
 - NON dire "ti faccio vedere" o "ti mostro" — di' "ti spiego come funziona la prova"
 - L'obiettivo finale è SEMPRE: fissare una CHIAMATA veloce → spiegare la prova gratuita
+- Se HAI il numero del lead: confermalo nella CTA ("Il tuo numero è X — posso chiamarti 5 minuti?")
+- Se NON HAI il numero del lead: DEVI chiederlo nella CTA ("A che numero posso chiamarti?"). Senza il numero non puoi chiamare — è il dato più importante da ottenere.
 """
