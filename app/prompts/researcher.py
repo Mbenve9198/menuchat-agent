@@ -31,7 +31,11 @@ COME MENUCHAT LO PORTA LÌ:
 
 Quando chiami un tool e il risultato non è sufficiente o ti suggerisce un'altra pista, seguila. Se trovi una recensione negativa devastante, è oro. Se non trovi niente di interessante nelle prime recensioni, cerca ancora o cambia angolo.
 
-Chiama il tool "done" solo quando sei sicuro che lo strategist avrà tutto quello che gli serve per costruire il messaggio perfetto per questo lead."""
+Le date delle recensioni contengono informazioni preziose: se 8 recensioni coprono 2 mesi, il ristorante riceve circa 4 recensioni al mese. Questa e la sua "velocity" attuale. Confrontala con quella dei competitor per capire se sta crescendo o stagnando.
+
+Se non riesci a trovare un ristorante su Google dopo 2 tentativi, usa i dati che hai gia (dal rank checker o dal contatto) e passa ad altro. Non sprecare round.
+
+Chiama il tool "done" solo quando sei sicuro che lo strategist avra tutto quello che gli serve per costruire il messaggio perfetto per questo lead."""
 
 
 RESEARCHER_TOOLS = [
