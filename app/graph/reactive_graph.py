@@ -1,7 +1,6 @@
 """
 Reactive LangGraph — responds to lead messages.
-Pipeline: researcher → memory → strategist → critic → writer → reviewer
-The researcher is autonomous and decides what to search (or not) based on the situation.
+Pipeline: researcher → memory → strategist → writer → reviewer
 """
 
 import logging
@@ -15,7 +14,6 @@ from app.graph.state import AgentState
 from app.graph.nodes.researcher import researcher_node
 from app.graph.nodes.memory_recall import memory_recall_node
 from app.graph.nodes.strategist import strategist_node
-from app.graph.nodes.strategy_critic import strategy_critic_node
 from app.graph.nodes.writer import writer_node
 from app.graph.nodes.reviewer import reviewer_node
 from app.graph.nodes.hibernate import hibernate_node
@@ -30,15 +28,7 @@ def _route_after_strategy(state: AgentState) -> str:
         return "hibernate"
     if strategy.get("escalate_human"):
         return "build_response"
-    return "strategy_critic"
-
-
-def _route_strategy_review(state: AgentState) -> str:
-    if state.get("strategy_approved"):
-        return "writer"
-    if state.get("strategy_attempts", 0) >= 3:
-        return "build_response"
-    return "strategist"
+    return "writer"
 
 
 def _route_review_result(state: AgentState) -> str:
@@ -56,7 +46,6 @@ def build_reactive_graph() -> StateGraph:
     graph.add_node("researcher", researcher_node)
     graph.add_node("memory_recall", memory_recall_node)
     graph.add_node("strategist", strategist_node)
-    graph.add_node("strategy_critic", strategy_critic_node)
     graph.add_node("writer", writer_node)
     graph.add_node("reviewer", reviewer_node)
     graph.add_node("hibernate", hibernate_node)
@@ -68,14 +57,8 @@ def build_reactive_graph() -> StateGraph:
     graph.add_edge("memory_recall", "strategist")
 
     graph.add_conditional_edges("strategist", _route_after_strategy, {
-        "strategy_critic": "strategy_critic",
-        "hibernate": "hibernate",
-        "build_response": "build_response",
-    })
-
-    graph.add_conditional_edges("strategy_critic", _route_strategy_review, {
         "writer": "writer",
-        "strategist": "strategist",
+        "hibernate": "hibernate",
         "build_response": "build_response",
     })
 
@@ -114,9 +97,6 @@ async def run_reactive(request: AgentRequest) -> AgentResponse:
         "request_type": "reactive",
         "thread_id": thread_id,
         "strategy": None,
-        "strategy_approved": False,
-        "strategy_feedback": None,
-        "strategy_attempts": 0,
         "draft": None,
         "review_result": None,
         "review_attempts": 0,

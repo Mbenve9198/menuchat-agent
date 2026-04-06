@@ -1,6 +1,6 @@
 """
 Proactive LangGraph — agent-initiated actions (outreach, follow-up, break-up, reactivation).
-Same pipeline as reactive but always takes the "complex" path (needs research).
+Pipeline: researcher → memory → strategist → writer → reviewer
 """
 
 import logging
@@ -14,7 +14,6 @@ from app.graph.state import AgentState
 from app.graph.nodes.researcher import researcher_node
 from app.graph.nodes.memory_recall import memory_recall_node
 from app.graph.nodes.strategist import strategist_node
-from app.graph.nodes.strategy_critic import strategy_critic_node
 from app.graph.nodes.writer import writer_node
 from app.graph.nodes.reviewer import reviewer_node
 from app.graph.nodes.hibernate import hibernate_node
@@ -24,24 +23,16 @@ logger = logging.getLogger("agent-service.graph.proactive")
 
 
 def _route_after_strategy(state: AgentState) -> str:
-    strategy = state.get("strategy", {})
+    strategy = state.get("strategy") or {}
     if strategy.get("hibernate"):
         return "hibernate"
     if strategy.get("escalate_human"):
         return "build_response"
-    return "strategy_critic"
-
-
-def _route_strategy_review(state: AgentState) -> str:
-    if state.get("strategy_approved"):
-        return "writer"
-    if state.get("strategy_attempts", 0) >= 3:
-        return "build_response"
-    return "strategist"
+    return "writer"
 
 
 def _route_review_result(state: AgentState) -> str:
-    review = state.get("review_result", {})
+    review = state.get("review_result") or {}
     if review.get("pass"):
         return "build_response"
     if state.get("review_attempts", 0) >= 2:
@@ -55,7 +46,6 @@ def build_proactive_graph() -> StateGraph:
     graph.add_node("researcher", researcher_node)
     graph.add_node("memory_recall", memory_recall_node)
     graph.add_node("strategist", strategist_node)
-    graph.add_node("strategy_critic", strategy_critic_node)
     graph.add_node("writer", writer_node)
     graph.add_node("reviewer", reviewer_node)
     graph.add_node("hibernate", hibernate_node)
@@ -67,14 +57,8 @@ def build_proactive_graph() -> StateGraph:
     graph.add_edge("memory_recall", "strategist")
 
     graph.add_conditional_edges("strategist", _route_after_strategy, {
-        "strategy_critic": "strategy_critic",
-        "hibernate": "hibernate",
-        "build_response": "build_response",
-    })
-
-    graph.add_conditional_edges("strategy_critic", _route_strategy_review, {
         "writer": "writer",
-        "strategist": "strategist",
+        "hibernate": "hibernate",
         "build_response": "build_response",
     })
 
@@ -112,11 +96,7 @@ async def run_proactive(request: ProactiveRequest) -> AgentResponse:
         "request": request,
         "request_type": "proactive",
         "thread_id": thread_id,
-        "complexity": "complex",
         "strategy": None,
-        "strategy_approved": False,
-        "strategy_feedback": None,
-        "strategy_attempts": 0,
         "draft": None,
         "review_result": None,
         "review_attempts": 0,
