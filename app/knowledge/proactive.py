@@ -29,6 +29,8 @@ Il lead non ha risposto. Cambia angolo. Se il primo messaggio usava la social pr
 Ultimo tentativo. Zero pressione. Dare valore anche nell'addio (il rank checker resta gratuito). Se cambia idea, sa dove trovarci.
 
 ### Riattivazione Lead Dormienti
+Il CRM, per i task reactivation / reactivation_warm / reactivation_cold / seasonal_reactivation, tenta **sia email sia WhatsApp** (se il contatto ha telefono): non contare sul solo canale “preferito” o ultimo usato — il messaggio deve funzionare come primo tocco multicanale per svegliare il lead.
+
 FONDAMENTALE: questo NON è un contatto freddo. C'è già stata una relazione. Il messaggio DEVE:
 - Riferirsi esplicitamente ai contatti precedenti ("ci siamo sentiti a ottobre", "avevamo parlato di...")
 - Usare informazioni emerse nelle chiamate o conversazioni passate (nomi, dettagli, obiezioni superate)
