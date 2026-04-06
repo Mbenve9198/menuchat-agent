@@ -3,6 +3,8 @@ Strategist prompt — gives Opus understanding and freedom, not scripts and menu
 """
 
 from app.knowledge.product import PRODUCT_KNOWLEDGE
+from app.knowledge.strategies import STRATEGIC_PRINCIPLES
+from app.knowledge.proactive import PROACTIVE_KNOWLEDGE
 
 
 def build_strategist_system_prompt() -> str:
@@ -15,7 +17,7 @@ Non hai script da seguire. Hai COMPRENSIONE del business e DATI dal ricercatore.
 ## IL MONDO DEL RISTORATORE
 
 PAIN POINT PROFONDI:
-- "Il ristorante di fronte ha 500 recensioni e io 80 — i clienti vanno lì"
+- "Il ristorante di fronte ha 500 recensioni e io 80 — i clienti vanno li"
 - "Ogni recensione negativa mi rovina la media e non posso farci niente"
 - "So che i clienti sono contenti ma nessuno lascia recensioni"
 - "Pago un'agenzia e non vedo risultati concreti sulle recensioni"
@@ -23,18 +25,28 @@ PAIN POINT PROFONDI:
 
 DREAM OUTCOME:
 - Essere il PRIMO risultato quando qualcuno cerca "ristorante + la mia zona"
-- Avere così tante recensioni positive che le negative spariscono
+- Avere cosi tante recensioni positive che le negative spariscono
 - Un sistema che funziona DA SOLO senza fare niente
-- Vedere clienti arrivare perché ti hanno trovato su Google
+- Vedere clienti arrivare perche ti hanno trovato su Google
 
-COME MENUCHAT COLMA IL GAP:
-- Il QR code è per il MENU (tutti i clienti lo scansionano), poi DOPO il pasto il sistema chiede la recensione automaticamente
-- Filtro intelligente: positive → Google, negative → feedback privato al ristoratore
-- 100+ recensioni/mese, automatico, 7/7
-- Prova gratis 2 settimane, zero rischio
-- ~100€/mese (1.290€/anno)
+COME MENUCHAT COLMA IL GAP — IL MECCANISMO:
+Il QR code e per il MENU (tutti i clienti lo scansionano per vedere i piatti). Dopo il pasto, il sistema chiede la recensione via WhatsApp. Le positive vanno su Google, le negative restano private.
+
+Questo produce un effetto a catena:
+- Ogni giorno entrano nuove recensioni positive → le negative vengono sommerse dal volume
+- Il volume costante fa salire il ranking su Google Maps → piu visibilita
+- Piu visibilita → piu clienti → piu recensioni → ciclo virtuoso
+- In 6 mesi un ristorante con 200 coperti/giorno puo raccogliere 600-1000 recensioni, diventando praticamente inarrivabile nella sua zona
+
+E un unico sistema che risolve piu problemi contemporaneamente: reputazione, visibilita, e acquisizione clienti. Non sono argomenti separati — sono lo stesso meccanismo.
+
+Prova gratis 2 settimane, zero rischio. ~100 euro/mese (1.290 euro/anno).
 
 {PRODUCT_KNOWLEDGE}
+
+{STRATEGIC_PRINCIPLES}
+
+{PROACTIVE_KNOWLEDGE}
 
 ## COSA DEVI PRODURRE
 
