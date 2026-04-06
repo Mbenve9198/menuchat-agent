@@ -162,6 +162,56 @@ def _build_user_context(request, contact: dict, rc_data: dict) -> str:
             content = m.content if hasattr(m, "content") else m.get("content", "")
             parts.append(f"[{role.upper()}]: {content[:300]}")
 
+    if contact.get("status"):
+        parts.append(f"- Stato CRM: {contact['status']}")
+    if contact.get("notes"):
+        parts.append(f"- Note CRM: {contact['notes']}")
+    if contact.get("callback_at"):
+        parts.append(f"- Callback programmato: {contact['callback_at']}")
+        if contact.get("callback_note"):
+            parts.append(f"  Nota callback: {contact['callback_note']}")
+
+    enrichment = getattr(request, "crm_enrichment", None)
+    if enrichment:
+        if enrichment.conversation_summary:
+            parts.append(f"\nRIASSUNTO CONVERSAZIONE PRECEDENTE:\n{enrichment.conversation_summary}")
+
+        if enrichment.contact_notes:
+            parts.append(f"\nNOTE SUL CONTATTO:\n{enrichment.contact_notes}")
+
+        if enrichment.human_notes:
+            parts.append(f"\nNOTE DEL TEAM VENDITE ({len(enrichment.human_notes)}):")
+            for n in enrichment.human_notes:
+                date = n.get("date", n.get("at", ""))
+                if date:
+                    date = str(date)[:10]
+                parts.append(f"  [{date}] {n.get('note', '')}")
+
+        if enrichment.call_history:
+            parts.append(f"\nSTORICO CHIAMATE ({len(enrichment.call_history)} chiamate):")
+            for call in enrichment.call_history:
+                date = str(call.date)[:10] if call.date else "N/A"
+                dur = call.duration_seconds
+                dur_str = f"{dur // 60}:{dur % 60:02d}" if dur else "0:00"
+                line = f"  [{date}] {dur_str} | esito: {call.outcome or 'N/A'}"
+                if call.initiated_by:
+                    line += f" | da: {call.initiated_by}"
+                parts.append(line)
+                if call.notes:
+                    parts.append(f"    📝 {call.notes}")
+                if call.transcript:
+                    parts.append(f"    🎙️ TRASCRIZIONE:\n{_indent(call.transcript, 6)}")
+
+        if enrichment.activity_summary:
+            s = enrichment.activity_summary
+            parts.append(f"\nATTIVITÀ CRM: {s.get('total_activities', 0)} totali")
+            if s.get("calls_made"):
+                parts.append(f"  Chiamate: {s['calls_made']} (risposte: {s.get('calls_answered', '?')})")
+            if s.get("last_call_date"):
+                parts.append(f"  Ultima chiamata: {str(s['last_call_date'])[:10]} → {s.get('last_call_outcome', 'N/A')}")
+            if s.get("status_changes"):
+                parts.append(f"  Cambi stato: {' → '.join(s['status_changes'])}")
+
     objs = getattr(request, "existing_objections", []) or []
     if objs:
         parts.append(f"\nOBIEZIONI GIÀ EMERSE: {', '.join(objs)}")
@@ -169,12 +219,21 @@ def _build_user_context(request, contact: dict, rc_data: dict) -> str:
     if pps:
         parts.append(f"PAIN POINTS RILEVATI: {', '.join(pps)}")
 
+    days = getattr(request, "days_since_last_contact", None)
+    if days:
+        parts.append(f"\nGIORNI DALL'ULTIMO CONTATTO: {days}")
+
     stage = getattr(request, "stage", "initial_reply")
     lead_source = getattr(request, "lead_source", "smartlead_outbound")
     is_first = getattr(request, "is_first_contact", False)
     parts.append(f"\nFASE: {stage} | FONTE: {lead_source} | PRIMO CONTATTO: {'sì' if is_first else 'no'}")
 
     return "\n".join(parts)
+
+
+def _indent(text: str, spaces: int) -> str:
+    prefix = " " * spaces
+    return "\n".join(prefix + line for line in text.split("\n"))
 
 
 def _extract_contact(request) -> dict:
@@ -192,6 +251,14 @@ def _extract_contact(request) -> dict:
         "website": c.website,
         "google_maps_link": c.google_maps_link,
         "contact_person": c.contact_person,
+        "status": c.status,
+        "place_id": c.place_id,
+        "coordinates": c.coordinates,
+        "call_requested": c.call_requested,
+        "call_preference": c.call_preference,
+        "notes": c.notes,
+        "callback_at": c.callback_at,
+        "callback_note": c.callback_note,
     }
 
 

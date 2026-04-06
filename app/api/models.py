@@ -18,6 +18,31 @@ class ContactData(BaseModel):
     website: str | None = None
     google_maps_link: str | None = None
     contact_person: str | None = None
+    status: str | None = None
+    place_id: str | None = None
+    coordinates: dict | None = None
+    call_requested: bool = False
+    call_preference: str | None = None
+    notes: str | None = None
+    callback_at: str | None = None
+    callback_note: str | None = None
+
+
+class CallRecord(BaseModel):
+    date: str
+    duration_seconds: int = 0
+    outcome: str | None = None
+    notes: str | None = None
+    transcript: str | None = None
+    initiated_by: str | None = None
+
+
+class CrmEnrichment(BaseModel):
+    call_history: list[CallRecord] = Field(default_factory=list)
+    human_notes: list[dict] = Field(default_factory=list)
+    conversation_summary: str | None = None
+    contact_notes: str | None = None
+    activity_summary: dict | None = None
 
 
 class Message(BaseModel):
@@ -69,6 +94,8 @@ class AgentRequest(BaseModel):
     is_first_contact: bool = False
     agent_identity: AgentIdentity = Field(default_factory=AgentIdentity)
 
+    crm_enrichment: CrmEnrichment | None = None
+
 
 class ProactiveRequest(BaseModel):
     """Agent-initiated action: follow-up, outreach, reactivation, break-up."""
@@ -86,6 +113,8 @@ class ProactiveRequest(BaseModel):
 
     days_since_last_contact: int | None = None
     last_outcome: str | None = None
+
+    crm_enrichment: CrmEnrichment | None = None
 
 
 class ResumeRequest(BaseModel):
