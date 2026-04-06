@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     qdrant_api_key: str = ""
     qdrant_collection_prefix: str = "menuchat"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    hf_token: str = ""
 
     host: str = "0.0.0.0"
     port: int = 8100
