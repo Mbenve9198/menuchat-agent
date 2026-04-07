@@ -78,9 +78,12 @@ async def build_response_node(state: AgentState) -> dict:
     research = state.get("research") or {}
     research_summary = research.get("available_data_summary", "")
 
+    email_subject = strategy.get("email_subject")
+
     response = AgentResponse(
         action=action,
         draft=draft,
+        email_subject=email_subject,
         channel=channel,
         strategy=strategy_out,
         tool_intents=[ToolIntent(**ti) for ti in tool_intents],

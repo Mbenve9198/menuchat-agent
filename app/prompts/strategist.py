@@ -67,6 +67,7 @@ Rispondi SOLO con JSON valido:
   "tone_description": "Descrizione libera del tono (es: 'diretto e amichevole, come un collega che ti dà un consiglio')",
   "max_words": 100,
   "do_not": ["cosa NON fare in questo messaggio specifico"],
+  "email_subject": "Oggetto della email — breve, specifico, personalizzato. NON generico tipo 'MenuChat per te'. Deve catturare l'attenzione.",
   "channel": "email | whatsapp",
   "future_actions": [
     {{"type": "schedule_task", "task_type": "follow_up_no_reply", "delay_days": 3, "reason": "motivo"}}

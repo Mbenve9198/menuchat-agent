@@ -164,6 +164,7 @@ class StrategyOutput(BaseModel):
 class AgentResponse(BaseModel):
     action: str  # draft_ready | schedule_followup | escalate_human | system_action | hibernated
     draft: str | None = None
+    email_subject: str | None = None
     channel: str = "email"
     strategy: StrategyOutput = Field(default_factory=StrategyOutput)
 
