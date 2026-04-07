@@ -145,7 +145,8 @@ def _build_user_context(request, contact: dict, rc_data: dict) -> str:
             for c in comps[:5]:
                 parts.append(f"  * {c.get('name')}: pos {c.get('rank')}, {c.get('rating')} stelle, {c.get('reviews')} rec, place_id: {c.get('place_id')}")
 
-        main_coords = full.get("mainResult", {}).get("coordinates", {})
+        main_result = full.get("mainResult") or {}
+        main_coords = main_result.get("coordinates") or {}
         if main_coords.get("lat") and main_coords.get("lng"):
             parts.append(f"- Coordinate dal rank check: lat={main_coords['lat']}, lng={main_coords['lng']}")
 
