@@ -52,6 +52,7 @@ class AgentState(TypedDict, total=False):
 
     # Generation
     draft: str | None
+    whatsapp_draft: str | None
     review_result: dict | None
     review_attempts: int
 

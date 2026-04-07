@@ -79,10 +79,12 @@ async def build_response_node(state: AgentState) -> dict:
     research_summary = research.get("available_data_summary", "")
 
     email_subject = strategy.get("email_subject")
+    whatsapp_draft = state.get("whatsapp_draft")
 
     response = AgentResponse(
         action=action,
         draft=draft,
+        whatsapp_draft=whatsapp_draft,
         email_subject=email_subject,
         channel=channel,
         strategy=strategy_out,

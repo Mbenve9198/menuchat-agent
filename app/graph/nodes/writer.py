@@ -123,8 +123,39 @@ async def writer_node(state: AgentState) -> dict:
 
     logger.info("Writer: %d words (max %d), retry=%d", len(draft.split()), max_words, review_attempts)
 
+    input_tokens = state.get("total_input_tokens", 0) + (resp.usage.input_tokens or 0)
+    output_tokens = state.get("total_output_tokens", 0) + (resp.usage.output_tokens or 0)
+
+    whatsapp_draft = None
+    contact = research.get("contact", {})
+    if contact.get("phone"):
+        wa_plan = strategy.get("whatsapp_plan", "")
+        wa_prompt = f"""Riscrivi questo messaggio email come un breve WhatsApp (max 60 parole).
+Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
+Firma solo col nome.
+
+{f"Indicazioni dallo strategist: {wa_plan}" if wa_plan else ""}
+
+MESSAGGIO EMAIL DA RIADATTARE:
+{draft}
+
+Scrivi SOLO il messaggio WhatsApp."""
+
+        wa_resp = await client.messages.create(
+            model=settings.model_writer,
+            max_tokens=300,
+            temperature=0.5,
+            system=_build_writer_system(identity),
+            messages=[{"role": "user", "content": wa_prompt}],
+        )
+        whatsapp_draft = wa_resp.content[0].text.strip()
+        input_tokens += wa_resp.usage.input_tokens or 0
+        output_tokens += wa_resp.usage.output_tokens or 0
+        logger.info("Writer WA: %d words", len(whatsapp_draft.split()))
+
     return {
         "draft": draft,
-        "total_input_tokens": state.get("total_input_tokens", 0) + (resp.usage.input_tokens or 0),
-        "total_output_tokens": state.get("total_output_tokens", 0) + (resp.usage.output_tokens or 0),
+        "whatsapp_draft": whatsapp_draft,
+        "total_input_tokens": input_tokens,
+        "total_output_tokens": output_tokens,
     }
