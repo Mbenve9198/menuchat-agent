@@ -147,8 +147,6 @@ async def writer_node(state: AgentState) -> dict:
     contact = research.get("contact", {})
 
     if inbound_channel == "whatsapp" and request_type == "reactive":
-        # Lead wrote on WhatsApp: the main draft IS the WhatsApp message.
-        # Rewrite the email-style draft as a proper WhatsApp message.
         wa_plan = strategy.get("whatsapp_plan", "")
         wa_prompt = f"""Riscrivi questo messaggio come un breve WhatsApp (max 60 parole).
 Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
@@ -169,6 +167,7 @@ Scrivi SOLO il messaggio WhatsApp."""
             messages=[{"role": "user", "content": wa_prompt}],
         )
         draft = wa_resp.content[0].text.strip()
+        whatsapp_draft = draft
         input_tokens += wa_resp.usage.input_tokens or 0
         output_tokens += wa_resp.usage.output_tokens or 0
         logger.info("Writer WA-only (reactive): %d words", len(draft.split()))
