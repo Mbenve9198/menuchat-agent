@@ -12,12 +12,12 @@ from app.memory.manager import store_run_memory
 logger = logging.getLogger("agent-service.nodes.response")
 
 COST_PER_INPUT_TOKEN = {
-    "opus": 5.0 / 1_000_000,
+    "opus": 15.0 / 1_000_000,
     "sonnet": 3.0 / 1_000_000,
     "haiku": 1.0 / 1_000_000,
 }
 COST_PER_OUTPUT_TOKEN = {
-    "opus": 25.0 / 1_000_000,
+    "opus": 75.0 / 1_000_000,
     "sonnet": 15.0 / 1_000_000,
     "haiku": 5.0 / 1_000_000,
 }
@@ -135,6 +135,8 @@ async def build_response_node(state: AgentState) -> dict:
         thinking=strategy.get("thinking", "")[:2000],
         model_used="opus-4.6",
         total_tokens=input_t + output_t,
+        total_input_tokens=input_t,
+        total_output_tokens=output_t,
         estimated_cost_usd=round(cost, 4),
     )
 

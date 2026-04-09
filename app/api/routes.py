@@ -1,6 +1,8 @@
+import asyncio
 import time
 import logging
 
+import httpx
 from fastapi import APIRouter, HTTPException
 
 from app.api.models import (
@@ -12,9 +14,39 @@ from app.api.models import (
     VoiceEvent,
     VoiceResponse,
 )
+from app.config import get_settings
 
 logger = logging.getLogger("agent-service.routes")
 router = APIRouter()
+
+_background_tasks: set[asyncio.Task] = set()
+
+
+async def _send_callback(task_id: str, response: dict, error: str | None = None):
+    """POST the agent result back to the CRM backend."""
+    settings = get_settings()
+    base = settings.menuchat_backend_url
+    if not base:
+        logger.warning("No MENUCHAT_BACKEND_URL configured, cannot send callback")
+        return
+    payload = {"taskId": task_id}
+    if error:
+        payload["error"] = error
+    else:
+        payload["response"] = response
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{base}/api/internal/agent-callback",
+                json=payload,
+                headers={"x-api-key": settings.crm_api_key or ""},
+            )
+            if resp.status_code >= 400:
+                logger.error("Callback failed (HTTP %d): %s", resp.status_code, resp.text[:300])
+            else:
+                logger.info("Callback sent for task %s", task_id)
+    except Exception as e:
+        logger.error("Callback request failed for task %s: %s", task_id, e)
 
 
 @router.get("/health")
@@ -43,63 +75,113 @@ async def debug_config():
     }
 
 
-@router.post("/agent/process", response_model=AgentResponse)
+@router.post("/agent/process")
 async def process_reactive(request: AgentRequest):
-    """Reactive flow: lead sent a message, generate a response."""
-    start = time.perf_counter()
+    """Reactive flow: lead sent a message. Returns 202 and processes in background."""
+    task_id = request.task_id
     logger.info(
-        "process_reactive | conv=%s contact=%s source=%s stage=%s",
+        "process_reactive | conv=%s contact=%s source=%s stage=%s task_id=%s",
         request.conversation_id,
         request.contact.email,
         request.lead_source,
         request.stage,
+        task_id,
     )
 
+    if task_id:
+        async def _run():
+            start = time.perf_counter()
+            try:
+                from app.graph.reactive_graph import run_reactive
+                result = await run_reactive(request)
+                result.processing_time_ms = int((time.perf_counter() - start) * 1000)
+                await _send_callback(task_id, result.model_dump())
+            except Exception as e:
+                logger.exception("process_reactive background failed: %s", e)
+                await _send_callback(task_id, None, error=str(e))
+        t = asyncio.create_task(_run())
+        _background_tasks.add(t)
+        t.add_done_callback(_background_tasks.discard)
+        return {"status": "processing", "taskId": task_id}
+
+    start = time.perf_counter()
     try:
         from app.graph.reactive_graph import run_reactive
-
         result = await run_reactive(request)
         result.processing_time_ms = int((time.perf_counter() - start) * 1000)
-        return result
+        return result.model_dump()
     except Exception as e:
         logger.exception("process_reactive failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/agent/proactive", response_model=AgentResponse)
+@router.post("/agent/proactive")
 async def process_proactive(request: ProactiveRequest):
-    """Proactive flow: agent-initiated action (outreach, follow-up, break-up, reactivation)."""
-    start = time.perf_counter()
+    """Proactive flow: agent-initiated action. Returns 202 and processes in background."""
+    task_id = request.task_id
     logger.info(
-        "process_proactive | type=%s contact=%s conv=%s",
+        "process_proactive | type=%s contact=%s conv=%s task_id=%s",
         request.task_type,
         request.contact.email,
         request.conversation_id,
+        task_id,
     )
 
+    if task_id:
+        async def _run():
+            start = time.perf_counter()
+            try:
+                from app.graph.proactive_graph import run_proactive
+                result = await run_proactive(request)
+                result.processing_time_ms = int((time.perf_counter() - start) * 1000)
+                await _send_callback(task_id, result.model_dump())
+            except Exception as e:
+                logger.exception("process_proactive background failed: %s", e)
+                await _send_callback(task_id, None, error=str(e))
+        t = asyncio.create_task(_run())
+        _background_tasks.add(t)
+        t.add_done_callback(_background_tasks.discard)
+        return {"status": "processing", "taskId": task_id}
+
+    start = time.perf_counter()
     try:
         from app.graph.proactive_graph import run_proactive
-
         result = await run_proactive(request)
         result.processing_time_ms = int((time.perf_counter() - start) * 1000)
-        return result
+        return result.model_dump()
     except Exception as e:
         logger.exception("process_proactive failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/agent/resume", response_model=AgentResponse)
+@router.post("/agent/resume")
 async def resume_workflow(request: ResumeRequest):
-    """Resume a hibernated workflow from a PostgreSQL checkpoint (Durable Execution)."""
-    start = time.perf_counter()
-    logger.info("resume_workflow | thread=%s", request.thread_id)
+    """Resume a hibernated workflow. Returns 202 and processes in background."""
+    task_id = request.task_id
+    logger.info("resume_workflow | thread=%s task_id=%s", request.thread_id, task_id)
 
+    if task_id:
+        async def _run():
+            start = time.perf_counter()
+            try:
+                from app.graph.reactive_graph import resume_hibernated
+                result = await resume_hibernated(request)
+                result.processing_time_ms = int((time.perf_counter() - start) * 1000)
+                await _send_callback(task_id, result.model_dump())
+            except Exception as e:
+                logger.exception("resume_workflow background failed: %s", e)
+                await _send_callback(task_id, None, error=str(e))
+        t = asyncio.create_task(_run())
+        _background_tasks.add(t)
+        t.add_done_callback(_background_tasks.discard)
+        return {"status": "processing", "taskId": task_id}
+
+    start = time.perf_counter()
     try:
         from app.graph.reactive_graph import resume_hibernated
-
         result = await resume_hibernated(request)
         result.processing_time_ms = int((time.perf_counter() - start) * 1000)
-        return result
+        return result.model_dump()
     except Exception as e:
         logger.exception("resume_workflow failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

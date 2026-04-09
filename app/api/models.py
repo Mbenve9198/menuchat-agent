@@ -96,6 +96,10 @@ class AgentRequest(BaseModel):
 
     crm_enrichment: CrmEnrichment | None = None
 
+    task_id: str | None = None
+
+    model_config = {"extra": "ignore"}
+
 
 class ProactiveRequest(BaseModel):
     """Agent-initiated action: follow-up, outreach, reactivation, break-up."""
@@ -116,11 +120,18 @@ class ProactiveRequest(BaseModel):
 
     crm_enrichment: CrmEnrichment | None = None
 
+    task_id: str | None = None
+
+    model_config = {"extra": "ignore"}
+
 
 class ResumeRequest(BaseModel):
     """Resume a hibernated workflow from PostgreSQL checkpoint."""
     thread_id: str
     updated_context: dict = Field(default_factory=dict)
+    task_id: str | None = None
+
+    model_config = {"extra": "ignore"}
 
 
 class VoiceEvent(BaseModel):
@@ -202,5 +213,7 @@ class AgentResponse(BaseModel):
     thinking: str | None = None
     model_used: str | None = None
     total_tokens: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
     estimated_cost_usd: float = 0.0
     processing_time_ms: int = 0

@@ -339,7 +339,7 @@ async def analyze_performance(trigger_data: dict) -> dict:
 
     try:
         for iteration in range(MAX_TOOL_CALLS):
-            response = await client.messages.create(
+            async with client.messages.stream(
                 model=settings.model_strategist,
                 max_tokens=32000,
                 temperature=1,
@@ -347,7 +347,8 @@ async def analyze_performance(trigger_data: dict) -> dict:
                 system=SALES_MANAGER_SYSTEM,
                 tools=TOOLS,
                 messages=messages,
-            )
+            ) as stream:
+                response = await stream.get_final_message()
 
             total_input_tokens += response.usage.input_tokens or 0
             total_output_tokens += response.usage.output_tokens or 0
