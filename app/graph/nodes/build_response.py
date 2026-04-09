@@ -53,6 +53,9 @@ async def build_response_node(state: AgentState) -> dict:
     tool_intents = list(state.get("tool_intents", []))
 
     terminal_status = _detect_terminal_state(strategy)
+    proposed_stage = strategy.get("new_stage", "")
+    if not terminal_status and proposed_stage == "terminal":
+        terminal_status = "not_interested_final"
 
     # Determine action
     if terminal_status:

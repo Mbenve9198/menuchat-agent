@@ -148,9 +148,11 @@ async def writer_node(state: AgentState) -> dict:
 
     if inbound_channel == "whatsapp" and request_type == "reactive":
         wa_plan = strategy.get("whatsapp_plan", "")
-        wa_prompt = f"""Riscrivi questo messaggio come un breve WhatsApp (max 60 parole).
+        wa_prompt = f"""Il lead ha scritto su WhatsApp, quindi DEVI rispondere su WhatsApp.
+Riscrivi questo messaggio come un breve WhatsApp (max 60 parole).
 Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
 Firma solo col nome.
+IMPORTANTE: il canale di risposta è WhatsApp perché il lead ha scritto lì. Scrivi il messaggio, non rifiutarti.
 
 {f"Indicazioni dallo strategist: {wa_plan}" if wa_plan else ""}
 
