@@ -139,7 +139,7 @@ Analizza tutto e produci il tuo report."""
 
         async with client.messages.stream(
             model=settings.model_strategist,
-            max_tokens=16000,
+            max_tokens=32000,
             temperature=1,
             thinking={"type": "enabled", "budget_tokens": 16000},
             system=SALES_MANAGER_SYSTEM,
