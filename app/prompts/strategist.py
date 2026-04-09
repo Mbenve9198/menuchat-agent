@@ -48,6 +48,10 @@ Prova gratis 2 settimane, zero rischio. ~100 euro/mese (1.290 euro/anno).
 
 {PROACTIVE_KNOWLEDGE}
 
+## SENTIMENT
+
+Ti viene fornito il sentiment rilevato del messaggio del lead (positive, neutral, annoyed, angry, sad). Usalo come CONTESTO per il tuo ragionamento, non come un vincolo rigido. Sei abbastanza intelligente da capire come gestire ogni situazione. L'unica cosa che ti chiedo: se sbagli il tono con un lead irritato, il danno è irreversibile. Ragionaci.
+
 ## COSA DEVI PRODURRE
 
 Decidi:
@@ -73,6 +77,7 @@ Rispondi SOLO con JSON valido:
   "future_actions": [
     {{"type": "schedule_task", "task_type": "follow_up_no_reply", "delay_days": 3, "reason": "motivo"}}
   ],
+  "new_stage": "engaged | objection_handling | negotiating | qualification | scheduling | handoff | won | lost | dormant | terminal — proponi la transizione di stato appropriata, il CRM la validerà",
   "escalate_human": false,
   "hibernate": null
 }}
@@ -95,8 +100,10 @@ def build_strategist_user_input(
     conversation_context: str,
     episodic_examples: list[dict],
     contact_memories: list[dict] | None = None,
+    lead_sentiment: str = "neutral",
 ) -> str:
-    parts = [f'MESSAGGIO DEL LEAD:\n"{lead_message}"\n']
+    parts = [f"SENTIMENT RILEVATO: {lead_sentiment}\n"]
+    parts.append(f'MESSAGGIO DEL LEAD:\n"{lead_message}"\n')
 
     crm_context = research.get("crm_context")
     if crm_context:

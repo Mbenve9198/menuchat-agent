@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     model_writer: str = "claude-sonnet-4-20250514"
     model_reviewer: str = "claude-haiku-4-5-20251001"
     model_router: str = "claude-haiku-4-5-20251001"
-    model_critic: str = "claude-sonnet-4-20250514"
+    model_critic: str = "claude-haiku-4-5-20251001"
+    model_planner: str = "claude-opus-4-20250514"
+    planner_thinking_budget: int = 8000
+    planner_max_tokens: int = 12000
 
     strategist_thinking_budget: int = 10000
     strategist_max_tokens: int = 16000

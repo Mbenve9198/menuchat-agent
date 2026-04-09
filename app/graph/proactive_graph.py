@@ -1,6 +1,6 @@
 """
 Proactive LangGraph — agent-initiated actions (outreach, follow-up, break-up, reactivation).
-Pipeline: researcher → memory → strategist → writer → reviewer
+Pipeline: researcher → memory → strategist → critic → writer → reviewer
 """
 
 import logging
@@ -14,6 +14,7 @@ from app.graph.state import AgentState
 from app.graph.nodes.researcher import researcher_node
 from app.graph.nodes.memory_recall import memory_recall_node
 from app.graph.nodes.strategist import strategist_node
+from app.graph.nodes.strategy_critic import strategy_critic_node
 from app.graph.nodes.writer import writer_node
 from app.graph.nodes.reviewer import reviewer_node
 from app.graph.nodes.hibernate import hibernate_node
@@ -28,7 +29,13 @@ def _route_after_strategy(state: AgentState) -> str:
         return "hibernate"
     if strategy.get("escalate_human"):
         return "build_response"
-    return "writer"
+    return "strategy_critic"
+
+
+def _route_after_critic(state: AgentState) -> str:
+    if state.get("strategy_approved", True):
+        return "writer"
+    return "strategist"
 
 
 def _route_review_result(state: AgentState) -> str:
@@ -46,6 +53,7 @@ def build_proactive_graph() -> StateGraph:
     graph.add_node("researcher", researcher_node)
     graph.add_node("memory_recall", memory_recall_node)
     graph.add_node("strategist", strategist_node)
+    graph.add_node("strategy_critic", strategy_critic_node)
     graph.add_node("writer", writer_node)
     graph.add_node("reviewer", reviewer_node)
     graph.add_node("hibernate", hibernate_node)
@@ -57,9 +65,14 @@ def build_proactive_graph() -> StateGraph:
     graph.add_edge("memory_recall", "strategist")
 
     graph.add_conditional_edges("strategist", _route_after_strategy, {
-        "writer": "writer",
+        "strategy_critic": "strategy_critic",
         "hibernate": "hibernate",
         "build_response": "build_response",
+    })
+
+    graph.add_conditional_edges("strategy_critic", _route_after_critic, {
+        "writer": "writer",
+        "strategist": "strategist",
     })
 
     graph.add_edge("writer", "reviewer")

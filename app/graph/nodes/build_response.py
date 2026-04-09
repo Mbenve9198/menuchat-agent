@@ -22,6 +22,29 @@ COST_PER_OUTPUT_TOKEN = {
     "haiku": 5.0 / 1_000_000,
 }
 
+TERMINAL_KEYWORDS = [
+    "business_closed", "chiuso", "chiusura",
+    "not_interested_final", "rifiuto definitivo",
+    "wrong_contact", "contatto errato",
+    "deceased", "deceduto",
+]
+
+
+def _detect_terminal_state(strategy: dict) -> str | None:
+    """Check if the strategy indicates a terminal situation (business closed, etc.)."""
+    approach = (strategy.get("strategy") or strategy.get("approach") or "").lower()
+    reasoning = (strategy.get("reasoning") or "").lower()
+    combined = f"{approach} {reasoning}"
+
+    if any(kw in combined for kw in ["business_closed", "chiuso definitivamente", "non è più aperto",
+                                      "chiusura definitiva", "ristorante chiuso", "attività chiusa"]):
+        return "business_closed"
+    if any(kw in combined for kw in ["not_interested_final", "rifiuto definitivo", "non contattare più"]):
+        return "not_interested_final"
+    if any(kw in combined for kw in ["wrong_contact", "contatto errato", "numero sbagliato"]):
+        return "wrong_contact"
+    return None
+
 
 async def build_response_node(state: AgentState) -> dict:
     strategy = state.get("strategy") or {}
@@ -29,8 +52,20 @@ async def build_response_node(state: AgentState) -> dict:
     review = state.get("review_result") or {}
     tool_intents = list(state.get("tool_intents", []))
 
+    terminal_status = _detect_terminal_state(strategy)
+
     # Determine action
-    if strategy.get("hibernate"):
+    if terminal_status:
+        action = "terminal"
+        tool_intents.append({
+            "tool": "mark_contact_terminal",
+            "params": {
+                "terminal_reason": terminal_status,
+                "cancel_pending_tasks": True,
+            },
+        })
+        logger.info("Terminal state detected: %s", terminal_status)
+    elif strategy.get("hibernate"):
         action = "hibernated"
     elif strategy.get("escalate_human"):
         action = "escalate_human"
@@ -146,11 +181,18 @@ async def _store_contact_observation(state: AgentState, strategy: dict, action: 
 
 
 def _infer_stage(strategy: dict, action: str) -> str | None:
+    if action == "terminal":
+        return "terminal"
     if action == "hibernated":
-        return "paused"
+        return "dormant"
+
+    proposed = strategy.get("new_stage")
+    if proposed:
+        return proposed
+
     approach = strategy.get("approach", "")
     if approach in ("escalate_human",):
-        return None
+        return "handoff"
     if strategy.get("future_actions"):
         for fa in strategy["future_actions"]:
             if fa.get("task_type") == "human_task":

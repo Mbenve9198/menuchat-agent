@@ -1,6 +1,6 @@
 """
 Reactive LangGraph — responds to lead messages.
-Pipeline: researcher → memory → strategist → writer → reviewer
+Pipeline: complexity_router → researcher → memory → strategist → (critic) → writer → reviewer
 """
 
 import logging
@@ -11,9 +11,11 @@ from langgraph.graph import StateGraph, END
 from app.api.models import AgentRequest, AgentResponse, ResumeRequest
 from app.db import get_checkpointer
 from app.graph.state import AgentState
+from app.graph.nodes.complexity_router import complexity_router_node
 from app.graph.nodes.researcher import researcher_node
 from app.graph.nodes.memory_recall import memory_recall_node
 from app.graph.nodes.strategist import strategist_node
+from app.graph.nodes.strategy_critic import strategy_critic_node
 from app.graph.nodes.writer import writer_node
 from app.graph.nodes.reviewer import reviewer_node
 from app.graph.nodes.hibernate import hibernate_node
@@ -22,13 +24,26 @@ from app.graph.nodes.build_response import build_response_node
 logger = logging.getLogger("agent-service.graph.reactive")
 
 
+def _route_after_complexity(state: AgentState) -> str:
+    complexity = state.get("complexity", "complex")
+    if complexity == "simple":
+        return "memory_recall"
+    return "researcher"
+
+
 def _route_after_strategy(state: AgentState) -> str:
     strategy = state.get("strategy") or {}
     if strategy.get("hibernate"):
         return "hibernate"
     if strategy.get("escalate_human"):
         return "build_response"
-    return "writer"
+    return "strategy_critic"
+
+
+def _route_after_critic(state: AgentState) -> str:
+    if state.get("strategy_approved", True):
+        return "writer"
+    return "strategist"
 
 
 def _route_review_result(state: AgentState) -> str:
@@ -43,23 +58,35 @@ def _route_review_result(state: AgentState) -> str:
 def build_reactive_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
+    graph.add_node("complexity_router", complexity_router_node)
     graph.add_node("researcher", researcher_node)
     graph.add_node("memory_recall", memory_recall_node)
     graph.add_node("strategist", strategist_node)
+    graph.add_node("strategy_critic", strategy_critic_node)
     graph.add_node("writer", writer_node)
     graph.add_node("reviewer", reviewer_node)
     graph.add_node("hibernate", hibernate_node)
     graph.add_node("build_response", build_response_node)
 
-    graph.set_entry_point("researcher")
+    graph.set_entry_point("complexity_router")
+
+    graph.add_conditional_edges("complexity_router", _route_after_complexity, {
+        "researcher": "researcher",
+        "memory_recall": "memory_recall",
+    })
 
     graph.add_edge("researcher", "memory_recall")
     graph.add_edge("memory_recall", "strategist")
 
     graph.add_conditional_edges("strategist", _route_after_strategy, {
-        "writer": "writer",
+        "strategy_critic": "strategy_critic",
         "hibernate": "hibernate",
         "build_response": "build_response",
+    })
+
+    graph.add_conditional_edges("strategy_critic", _route_after_critic, {
+        "writer": "writer",
+        "strategist": "strategist",
     })
 
     graph.add_edge("writer", "reviewer")

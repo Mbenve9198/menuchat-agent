@@ -94,6 +94,20 @@ def _build_writer_input(strategy: dict, research: dict, messages: list) -> str:
     return "\n".join(parts)
 
 
+def _get_inbound_channel(state: AgentState) -> str:
+    """Determine the inbound channel from the last lead message or request metadata."""
+    request = state.get("request")
+    if not request:
+        return "email"
+    messages = getattr(request, "messages", []) or []
+    for m in reversed(messages):
+        role = m.role if hasattr(m, "role") else m.get("role", "")
+        if role == "lead":
+            channel = m.channel if hasattr(m, "channel") else m.get("channel", "email")
+            return channel
+    return "email"
+
+
 async def writer_node(state: AgentState) -> dict:
     request = state["request"]
     strategy = state.get("strategy") or {}
@@ -126,9 +140,41 @@ async def writer_node(state: AgentState) -> dict:
     input_tokens = state.get("total_input_tokens", 0) + (resp.usage.input_tokens or 0)
     output_tokens = state.get("total_output_tokens", 0) + (resp.usage.output_tokens or 0)
 
+    request_type = state.get("request_type", "reactive")
+    inbound_channel = _get_inbound_channel(state)
+
     whatsapp_draft = None
     contact = research.get("contact", {})
-    if contact.get("phone"):
+
+    if inbound_channel == "whatsapp" and request_type == "reactive":
+        # Lead wrote on WhatsApp: the main draft IS the WhatsApp message.
+        # Rewrite the email-style draft as a proper WhatsApp message.
+        wa_plan = strategy.get("whatsapp_plan", "")
+        wa_prompt = f"""Riscrivi questo messaggio come un breve WhatsApp (max 60 parole).
+Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
+Firma solo col nome.
+
+{f"Indicazioni dallo strategist: {wa_plan}" if wa_plan else ""}
+
+MESSAGGIO DA RIADATTARE:
+{draft}
+
+Scrivi SOLO il messaggio WhatsApp."""
+
+        wa_resp = await client.messages.create(
+            model=settings.model_writer,
+            max_tokens=300,
+            temperature=0.5,
+            system=_build_writer_system(identity),
+            messages=[{"role": "user", "content": wa_prompt}],
+        )
+        draft = wa_resp.content[0].text.strip()
+        input_tokens += wa_resp.usage.input_tokens or 0
+        output_tokens += wa_resp.usage.output_tokens or 0
+        logger.info("Writer WA-only (reactive): %d words", len(draft.split()))
+
+    elif contact.get("phone") and request_type == "proactive":
+        # Proactive: generate both email + WhatsApp drafts
         wa_plan = strategy.get("whatsapp_plan", "")
         wa_prompt = f"""Riscrivi questo messaggio email come un breve WhatsApp (max 60 parole).
 Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
@@ -151,7 +197,7 @@ Scrivi SOLO il messaggio WhatsApp."""
         whatsapp_draft = wa_resp.content[0].text.strip()
         input_tokens += wa_resp.usage.input_tokens or 0
         output_tokens += wa_resp.usage.output_tokens or 0
-        logger.info("Writer WA: %d words", len(whatsapp_draft.split()))
+        logger.info("Writer WA (proactive dual): %d words", len(whatsapp_draft.split()))
 
     return {
         "draft": draft,

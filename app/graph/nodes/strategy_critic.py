@@ -23,20 +23,25 @@ def _get_client() -> anthropic.AsyncAnthropic:
     return _client
 
 
-CRITIC_PROMPT = """Sei un quality critic per strategie di vendita. Valuta il piano dello strategist.
+CRITIC_PROMPT = """Sei un fact-checker per strategie di vendita. Il tuo ruolo NON è giudicare la creatività o l'approccio dello strategist — lui è più intelligente di te su quello. Il tuo ruolo è SOLO verificare errori oggettivi.
 
-CRITERI DI VALIDAZIONE:
-1. COERENZA: La strategia è coerente con il messaggio del lead? (es: se il lead chiede il prezzo, la strategia deve affrontare il prezzo)
-2. DATI: I dati citati in data_to_include esistono nel RESEARCH DATA fornito? Se cita un cliente/nome/numero che non è nei dati → FAIL
-3. CTA: La call-to-action è appropriata per la fase? (non proporre chiamata al primo contatto outbound se il lead non ha mostrato interesse)
-4. DIVIETI: La strategia rispetta i do_not? (es: non citare prezzo al primo contatto rank checker)
-5. OBIETTIVO: La strategia converge verso l'obiettivo (fissare chiamata di 5 minuti)?
-6. TONE: Il tono è appropriato per il contesto? (es: non essere aggressivo con un lead che dice "non mi interessa")
+BOCCIA SOLO SE trovi uno di questi problemi CONCRETI:
+1. ALLUCINAZIONE DATI: La strategia cita nomi di clienti, numeri, statistiche o fatti che NON esistono nei dati di ricerca forniti. Se dice "il ristorante X ha Y recensioni" e quel dato non è nei research data → FAIL.
+2. CONTRADDIZIONE LOGICA: La strategia si contraddice internamente (es: dice "non parlare del prezzo" ma poi nel message_plan dice "menziona il costo").
+3. VIOLAZIONE ESPLICITA: La strategia propone un'azione che viola una regola nei do_not che lo strategist stesso ha definito.
+
+NON BOCCIARE per:
+- Scelte di tono o approccio — lo strategist ha più contesto di te
+- La CTA che ritieni "troppo presto" o "troppo tardi" — lo strategist ragiona con thinking esteso
+- Strategie creative o non convenzionali — sono intenzionali
+- Lunghezza o struttura del messaggio pianificato
+
+In caso di dubbio, APPROVA. Meglio un messaggio imperfetto che un loop infinito di riscritture.
 
 Rispondi SOLO con JSON:
 {"approved": true, "feedback": ""}
 oppure
-{"approved": false, "feedback": "Problema specifico: ... Cosa correggere: ..."}"""
+{"approved": false, "feedback": "ERRORE FATTUALE: [dato inventato] non esiste nei research data. Correggere citando solo dati verificati."}"""
 
 
 async def strategy_critic_node(state: AgentState) -> dict:
@@ -44,7 +49,7 @@ async def strategy_critic_node(state: AgentState) -> dict:
     research = state.get("research", {})
     attempts = state.get("strategy_attempts", 0)
 
-    if attempts >= 3:
+    if attempts >= 2:
         logger.warning("Strategy critic: max attempts reached, forcing approval")
         return {"strategy_approved": True, "strategy_feedback": None}
 

@@ -48,7 +48,7 @@ class CrmEnrichment(BaseModel):
 class Message(BaseModel):
     role: str  # lead | agent | human
     content: str
-    channel: str = "email"
+    channel: str = "email"  # email | whatsapp | voice
     created_at: str | None = None
 
 
@@ -121,6 +121,29 @@ class ResumeRequest(BaseModel):
     """Resume a hibernated workflow from PostgreSQL checkpoint."""
     thread_id: str
     updated_context: dict = Field(default_factory=dict)
+
+
+class VoiceEvent(BaseModel):
+    """Real-time voice event — for future voice channel integration."""
+    event_type: str  # call_started | speech_detected | silence | call_ended
+    contact: ContactData
+    conversation_id: str | None = None
+    transcript_chunk: str | None = None
+    call_sid: str | None = None
+    duration_seconds: int = 0
+    caller_sentiment: str | None = None
+    agent_identity: AgentIdentity = Field(default_factory=AgentIdentity)
+
+
+class VoiceResponse(BaseModel):
+    """Agent's real-time response for voice channel."""
+    action: str  # speak | hold | transfer | end_call
+    text: str | None = None
+    emotion: str = "neutral"
+    speed: float = 1.0
+    transfer_to: str | None = None
+    tool_intents: list[ToolIntent] = Field(default_factory=list)
+    new_stage: str | None = None
 
 
 class FeedbackRequest(BaseModel):

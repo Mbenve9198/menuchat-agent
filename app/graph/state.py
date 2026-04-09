@@ -41,6 +41,9 @@ class AgentState(TypedDict, total=False):
     # Complexity routing
     complexity: str  # "simple" | "complex"
 
+    # Sentiment of inbound message
+    lead_sentiment: str  # "positive" | "neutral" | "annoyed" | "angry" | "sad"
+
     # Research
     research: ResearchData
 
