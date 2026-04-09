@@ -83,9 +83,13 @@ def _build_conversation_context(request) -> str:
     if directives:
         parts.append("\nDIRETTIVE DEL SALES MANAGER (aggiornate):")
         for d in directives:
-            parts.append(f"  [{d.get('priority', 'medium').upper()}] {d.get('directive', '')}")
-            if d.get("reason"):
-                parts.append(f"    Motivo: {d['reason']}")
+            d_type = d.get("type", "observation")
+            confidence = d.get("confidence", "low")
+            data_pts = d.get("dataPoints", 0)
+            label = f"[{d_type.upper()} | confidence:{confidence} | {data_pts} data points]"
+            parts.append(f"  {label} {d.get('directive', '')}")
+            if d.get("evidence"):
+                parts.append(f"    Evidenza: {d['evidence']}")
 
     return "\n".join(parts)
 

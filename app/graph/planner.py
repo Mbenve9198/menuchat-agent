@@ -120,10 +120,14 @@ async def plan_actions(event: dict) -> dict:
                 if resp.status_code == 200:
                     dirs = resp.json().get("directives", [])
                     if dirs:
-                        directives_context = "\n\nDIRETTIVE SALES MANAGER:\n" + "\n".join(
-                            f"- [{d.get('priority', 'medium').upper()}] {d.get('directive', '')}"
-                            for d in dirs
-                        )
+                        lines = []
+                        for d in dirs:
+                            d_type = d.get("type", "observation")
+                            confidence = d.get("confidence", "low")
+                            data_pts = d.get("dataPoints", 0)
+                            label = f"[{d_type.upper()} | confidence:{confidence} | {data_pts}dp]"
+                            lines.append(f"- {label} {d.get('directive', '')}")
+                        directives_context = "\n\nDIRETTIVE SALES MANAGER:\n" + "\n".join(lines)
     except Exception:
         pass
 
