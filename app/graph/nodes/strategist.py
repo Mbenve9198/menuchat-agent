@@ -61,10 +61,16 @@ def _build_conversation_context(request) -> str:
     if messages and len(messages) > 0:
         recent = messages[-6:] if len(messages) > 6 else messages
         parts.append("\nULTIMI MESSAGGI:")
+        last_lead_channel = None
         for m in recent:
             role = m.role if hasattr(m, "role") else m.get("role", "?")
             content = m.content if hasattr(m, "content") else m.get("content", "")
-            parts.append(f"[{role.upper()}]: {content[:300]}")
+            channel = m.channel if hasattr(m, "channel") else m.get("channel", "email")
+            parts.append(f"[{role.upper()} via {channel}]: {content[:300]}")
+            if role == "lead":
+                last_lead_channel = channel
+        if last_lead_channel:
+            parts.append(f"\nCANALE INBOUND: il lead ha scritto su {last_lead_channel.upper()}")
 
     return "\n".join(parts)
 

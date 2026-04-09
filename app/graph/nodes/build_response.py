@@ -80,18 +80,8 @@ async def build_response_node(state: AgentState) -> dict:
         action = "escalate_human"
 
     channel = strategy.get("channel", "email")
-
-    if state.get("request_type") == "reactive":
-        request = state.get("request")
-        if request:
-            msgs = getattr(request, "messages", []) or []
-            for m in reversed(msgs):
-                role = m.role if hasattr(m, "role") else m.get("role", "")
-                if role == "lead":
-                    inbound_ch = m.channel if hasattr(m, "channel") else m.get("channel", "email")
-                    if inbound_ch != "email":
-                        channel = inbound_ch
-                    break
+    if channel == "both":
+        channel = "email"
 
     # Accumulate future actions as schedule_task intents
     for fa in strategy.get("future_actions", []):

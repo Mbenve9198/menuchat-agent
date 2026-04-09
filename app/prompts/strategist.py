@@ -72,8 +72,8 @@ Rispondi SOLO con JSON valido:
   "max_words": 100,
   "do_not": ["cosa NON fare in questo messaggio specifico"],
   "email_subject": "Oggetto della email — breve, specifico, personalizzato. NON generico tipo 'MenuChat per te'. Deve catturare l'attenzione.",
-  "whatsapp_plan": "Piano per la versione WhatsApp: stessa strategia ma PIÙ BREVE e DIRETTA. Max 50-80 parole, tono conversazionale come un messaggio tra colleghi. No formalismi. Se il canale principale è email, il WhatsApp è un tocco aggiuntivo per massimizzare la risposta.",
-  "channel": "email | whatsapp",
+  "whatsapp_plan": "Se il channel è whatsapp o both: istruzioni per il messaggio WhatsApp (max 50-80 parole, tono conversazionale, no formalismi). Se channel è email, lascia vuoto.",
+  "channel": "email | whatsapp | both — REGOLA: se il lead ha scritto su un canale, rispondi sullo STESSO canale. Usa 'both' solo nel proattivo quando vuoi massimizzare la risposta.",
   "future_actions": [
     {{"type": "schedule_task", "task_type": "follow_up_no_reply", "delay_days": 3, "reason": "motivo"}}
   ],

@@ -94,18 +94,34 @@ def _build_writer_input(strategy: dict, research: dict, messages: list) -> str:
     return "\n".join(parts)
 
 
-def _get_inbound_channel(state: AgentState) -> str:
-    """Determine the inbound channel from the last lead message or request metadata."""
-    request = state.get("request")
-    if not request:
-        return "email"
-    messages = getattr(request, "messages", []) or []
-    for m in reversed(messages):
-        role = m.role if hasattr(m, "role") else m.get("role", "")
-        if role == "lead":
-            channel = m.channel if hasattr(m, "channel") else m.get("channel", "email")
-            return channel
-    return "email"
+async def _generate_whatsapp_draft(
+    client, settings, identity, strategy: dict, email_draft: str
+) -> tuple[str, int, int]:
+    """Generate a WhatsApp-adapted version of a draft."""
+    wa_plan = strategy.get("whatsapp_plan", "")
+    wa_prompt = f"""Riscrivi questo messaggio come un breve WhatsApp (max 60 parole).
+Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
+Firma solo col nome.
+
+{f"Indicazioni dallo strategist: {wa_plan}" if wa_plan else ""}
+
+MESSAGGIO DA RIADATTARE:
+{email_draft}
+
+Scrivi SOLO il messaggio WhatsApp."""
+
+    wa_resp = await client.messages.create(
+        model=settings.model_writer,
+        max_tokens=300,
+        temperature=0.5,
+        system=_build_writer_system(identity),
+        messages=[{"role": "user", "content": wa_prompt}],
+    )
+    return (
+        wa_resp.content[0].text.strip(),
+        wa_resp.usage.input_tokens or 0,
+        wa_resp.usage.output_tokens or 0,
+    )
 
 
 async def writer_node(state: AgentState) -> dict:
@@ -140,65 +156,27 @@ async def writer_node(state: AgentState) -> dict:
     input_tokens = state.get("total_input_tokens", 0) + (resp.usage.input_tokens or 0)
     output_tokens = state.get("total_output_tokens", 0) + (resp.usage.output_tokens or 0)
 
-    request_type = state.get("request_type", "reactive")
-    inbound_channel = _get_inbound_channel(state)
-
+    channel = strategy.get("channel", "email")
     whatsapp_draft = None
-    contact = research.get("contact", {})
 
-    if inbound_channel == "whatsapp" and request_type == "reactive":
-        wa_plan = strategy.get("whatsapp_plan", "")
-        wa_prompt = f"""Il lead ha scritto su WhatsApp, quindi DEVI rispondere su WhatsApp.
-Riscrivi questo messaggio come un breve WhatsApp (max 60 parole).
-Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
-Firma solo col nome.
-IMPORTANTE: il canale di risposta è WhatsApp perché il lead ha scritto lì. Scrivi il messaggio, non rifiutarti.
-
-{f"Indicazioni dallo strategist: {wa_plan}" if wa_plan else ""}
-
-MESSAGGIO DA RIADATTARE:
-{draft}
-
-Scrivi SOLO il messaggio WhatsApp."""
-
-        wa_resp = await client.messages.create(
-            model=settings.model_writer,
-            max_tokens=300,
-            temperature=0.5,
-            system=_build_writer_system(identity),
-            messages=[{"role": "user", "content": wa_prompt}],
+    if channel == "whatsapp":
+        wa_text, wa_in, wa_out = await _generate_whatsapp_draft(
+            client, settings, identity, strategy, draft,
         )
-        draft = wa_resp.content[0].text.strip()
-        whatsapp_draft = draft
-        input_tokens += wa_resp.usage.input_tokens or 0
-        output_tokens += wa_resp.usage.output_tokens or 0
-        logger.info("Writer WA-only (reactive): %d words", len(draft.split()))
+        draft = wa_text
+        whatsapp_draft = wa_text
+        input_tokens += wa_in
+        output_tokens += wa_out
+        logger.info("Writer WA-only: %d words", len(draft.split()))
 
-    elif contact.get("phone") and request_type == "proactive":
-        # Proactive: generate both email + WhatsApp drafts
-        wa_plan = strategy.get("whatsapp_plan", "")
-        wa_prompt = f"""Riscrivi questo messaggio email come un breve WhatsApp (max 60 parole).
-Tono: informale, diretto, come un messaggio tra colleghi. No formalismi, no firma lunga.
-Firma solo col nome.
-
-{f"Indicazioni dallo strategist: {wa_plan}" if wa_plan else ""}
-
-MESSAGGIO EMAIL DA RIADATTARE:
-{draft}
-
-Scrivi SOLO il messaggio WhatsApp."""
-
-        wa_resp = await client.messages.create(
-            model=settings.model_writer,
-            max_tokens=300,
-            temperature=0.5,
-            system=_build_writer_system(identity),
-            messages=[{"role": "user", "content": wa_prompt}],
+    elif channel == "both":
+        wa_text, wa_in, wa_out = await _generate_whatsapp_draft(
+            client, settings, identity, strategy, draft,
         )
-        whatsapp_draft = wa_resp.content[0].text.strip()
-        input_tokens += wa_resp.usage.input_tokens or 0
-        output_tokens += wa_resp.usage.output_tokens or 0
-        logger.info("Writer WA (proactive dual): %d words", len(whatsapp_draft.split()))
+        whatsapp_draft = wa_text
+        input_tokens += wa_in
+        output_tokens += wa_out
+        logger.info("Writer dual (email+WA): %d words WA", len(whatsapp_draft.split()))
 
     return {
         "draft": draft,
