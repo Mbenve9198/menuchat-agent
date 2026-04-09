@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timezone
 
 import anthropic
+import httpx
 
 from app.config import get_settings
 from app.memory.contact_memory import recall_contact_history
@@ -109,6 +110,23 @@ async def plan_actions(event: dict) -> dict:
             for m in contact_memories[:5]
         )
 
+    directives_context = ""
+    try:
+        settings_obj = get_settings()
+        base = settings_obj.menuchat_backend_url
+        if base:
+            with httpx.Client(timeout=3) as http:
+                resp = http.get(f"{base}/api/internal/directives", params={"scope": "planner"})
+                if resp.status_code == 200:
+                    dirs = resp.json().get("directives", [])
+                    if dirs:
+                        directives_context = "\n\nDIRETTIVE SALES MANAGER:\n" + "\n".join(
+                            f"- [{d.get('priority', 'medium').upper()}] {d.get('directive', '')}"
+                            for d in dirs
+                        )
+    except Exception:
+        pass
+
     user_input = f"""EVENTO: {event.get('type', 'unknown')}
 TIMESTAMP: {datetime.now(timezone.utc).isoformat()}
 
@@ -120,7 +138,7 @@ CONVERSAZIONE:
 
 CONTESTO AGGIUNTIVO:
 {json.dumps(event.get('context', {}), ensure_ascii=False, indent=2)}
-{memory_context}
+{memory_context}{directives_context}
 
 Che azioni proponi?"""
 

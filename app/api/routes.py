@@ -187,6 +187,19 @@ async def plan_actions(event: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/agent/sales-manager")
+async def sales_manager_analysis(report_data: dict):
+    """Sales Manager Agent: analyzes team performance, produces directives and briefing."""
+    logger.info("sales_manager | received report with %d keys", len(report_data))
+    try:
+        from app.graph.sales_manager import analyze_performance
+        result = await analyze_performance(report_data)
+        return result
+    except Exception as e:
+        logger.exception("sales_manager failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/memory/consolidate")
 async def consolidate_memories():
     """Periodic job: consolidate memories for contacts with many observations."""

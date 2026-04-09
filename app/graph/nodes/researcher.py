@@ -5,9 +5,12 @@ Autonomously decides what to search for, when to dig deeper, and when it has eno
 
 import json
 import logging
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import anthropic
+import httpx
 
 from app.config import get_settings
 from app.graph.state import AgentState, ResearchData
@@ -19,6 +22,40 @@ from app.tools.smartlead_client import fetch_message_history
 logger = logging.getLogger("agent-service.nodes.researcher")
 
 MAX_ROUNDS = 15
+
+
+async def _fetch_research_cache(email: str) -> dict | None:
+    """Check CRM for cached research data."""
+    settings = get_settings()
+    base = settings.menuchat_backend_url
+    if not base or not email:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{base}/api/internal/research-cache/{email}")
+            if resp.status_code == 200:
+                body = resp.json()
+                if body.get("found"):
+                    return body["data"]
+    except Exception as e:
+        logger.debug("Research cache fetch failed: %s", e)
+    return None
+
+
+async def _save_research_cache(email: str, data: dict) -> None:
+    """Save research results to CRM cache."""
+    settings = get_settings()
+    base = settings.menuchat_backend_url
+    if not base or not email:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(f"{base}/api/internal/research-cache", json={
+                "contactEmail": email,
+                **data,
+            })
+    except Exception as e:
+        logger.debug("Research cache save failed: %s", e)
 
 _client: anthropic.AsyncAnthropic | None = None
 
@@ -80,6 +117,10 @@ async def _execute_tool(name: str, params: dict) -> Any:
 def _build_user_context(request, contact: dict, rc_data: dict) -> str:
     """Build the context message that the researcher agent receives."""
     parts = []
+
+    now_rome = datetime.now(tz=ZoneInfo("Europe/Rome"))
+    parts.append(f"DATA CORRENTE: {now_rome.strftime('%A %d %B %Y, ore %H:%M')} (timezone Roma)")
+    parts.append("")
 
     lead_message = getattr(request, "lead_message", "") or ""
     if lead_message:
@@ -268,7 +309,34 @@ async def researcher_node(state: AgentState) -> dict:
     contact = _extract_contact(request)
     rc_data = getattr(request, "rank_checker_data", None) or {}
 
+    cached = await _fetch_research_cache(contact.get("email", ""))
+    cache_context = ""
+    if cached:
+        fetched_at = cached.get("fetchedAt", "")
+        hours_ago = ""
+        if fetched_at:
+            try:
+                dt = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
+                delta = datetime.now(tz=ZoneInfo("UTC")) - dt
+                hours_ago = f" ({int(delta.total_seconds() / 3600)} ore fa)"
+            except Exception:
+                pass
+        parts = [f"\nDATI GIA' DISPONIBILI (ricercati il {fetched_at[:10] if fetched_at else '?'}{hours_ago}):"]
+        bd = cached.get("businessData") or {}
+        if bd.get("name"):
+            parts.append(f"  Business: {bd['name']}, rating {bd.get('rating', '?')}, {bd.get('reviewsCount', '?')} recensioni")
+        rd = cached.get("rankingData") or {}
+        if rd.get("keyword"):
+            parts.append(f"  Ranking: pos {rd.get('position', '?')} per '{rd['keyword']}'")
+        rv = cached.get("reviewsData") or {}
+        if rv.get("totalCount"):
+            parts.append(f"  Reviews: {rv['totalCount']} totali, trend {rv.get('trend', '?')}")
+        parts.append("  Se i dati sono recenti, usali. Se sono vecchi di piu' di 24h, ri-verifica solo i dati critici.")
+        cache_context = "\n".join(parts)
+
     user_message = _build_user_context(request, contact, rc_data)
+    if cache_context:
+        user_message += cache_context
     messages: list[dict] = [{"role": "user", "content": user_message}]
 
     settings = get_settings()
@@ -339,6 +407,38 @@ async def researcher_node(state: AgentState) -> dict:
         list(all_results.keys()),
         round_num + 1 if 'round_num' in dir() else 0,
     )
+
+    if all_results and contact.get("email"):
+        cache_payload = {}
+        for r in all_results.get("research_business", []):
+            if r and not r.get("error"):
+                cache_payload["businessData"] = {
+                    "name": r.get("name"), "address": r.get("address"),
+                    "phone": r.get("phone"), "rating": r.get("rating"),
+                    "reviewsCount": r.get("reviews"), "category": r.get("type"),
+                    "placeId": r.get("place_id"), "website": r.get("website"),
+                }
+        for r in all_results.get("check_ranking", []):
+            if r and not r.get("error"):
+                cache_payload["rankingData"] = {
+                    "keyword": r.get("keyword"), "position": r.get("user_rank") or r.get("rank"),
+                    "totalResults": r.get("total_results"),
+                    "topCompetitors": r.get("top_competitors", [])[:5],
+                    "checkedAt": datetime.now(tz=ZoneInfo("UTC")).isoformat(),
+                }
+        all_reviews = []
+        for r in all_results.get("fetch_reviews", []):
+            all_reviews.extend(r.get("reviews", []))
+        if all_reviews:
+            neg = [rv for rv in all_reviews if (rv.get("rating") or 5) <= 3]
+            cache_payload["reviewsData"] = {
+                "recentReviews": all_reviews[:10],
+                "averageRating": contact.get("rating"),
+                "totalCount": contact.get("reviews"),
+                "negativeThemes": list({rv.get("text", "")[:50] for rv in neg[:3]}),
+            }
+        if cache_payload:
+            await _save_research_cache(contact["email"], cache_payload)
 
     return {
         "research": research,

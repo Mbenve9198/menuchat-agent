@@ -5,8 +5,11 @@ The strategic brain of the agent.
 
 import json
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import anthropic
+import httpx
 
 from app.config import get_settings
 from app.graph.state import AgentState
@@ -26,6 +29,10 @@ def _get_client() -> anthropic.AsyncAnthropic:
 
 def _build_conversation_context(request) -> str:
     parts = []
+
+    now_rome = datetime.now(tz=ZoneInfo("Europe/Rome"))
+    parts.append(f"DATA CORRENTE: {now_rome.strftime('%A %d %B %Y, ore %H:%M')} (timezone Roma)")
+
     objections = getattr(request, "existing_objections", []) or []
     if objections:
         parts.append(f"OBIEZIONI GIÀ EMERSE: {', '.join(objections)}")
@@ -72,7 +79,31 @@ def _build_conversation_context(request) -> str:
         if last_lead_channel:
             parts.append(f"\nCANALE INBOUND: il lead ha scritto su {last_lead_channel.upper()}")
 
+    directives = _fetch_directives_sync("strategist")
+    if directives:
+        parts.append("\nDIRETTIVE DEL SALES MANAGER (aggiornate):")
+        for d in directives:
+            parts.append(f"  [{d.get('priority', 'medium').upper()}] {d.get('directive', '')}")
+            if d.get("reason"):
+                parts.append(f"    Motivo: {d['reason']}")
+
     return "\n".join(parts)
+
+
+def _fetch_directives_sync(scope: str) -> list:
+    """Fetch active Sales Manager directives from CRM (sync wrapper)."""
+    settings = get_settings()
+    base = settings.menuchat_backend_url
+    if not base:
+        return []
+    try:
+        with httpx.Client(timeout=3) as c:
+            resp = c.get(f"{base}/api/internal/directives", params={"scope": scope})
+            if resp.status_code == 200:
+                return resp.json().get("directives", [])
+    except Exception:
+        pass
+    return []
 
 
 async def strategist_node(state: AgentState) -> dict:
